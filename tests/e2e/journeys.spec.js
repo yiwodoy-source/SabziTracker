@@ -35,12 +35,14 @@ test('Journey 2 — Manual entry: open modal → fill all fields → save → ve
   await page.evaluate(() => loadDemoData());
   await page.waitForTimeout(200);
 
+  await page.evaluate(() => go('log'));
+  await page.waitForTimeout(200);
   await page.click('#btn-add');
   await page.waitForSelector('#m-item', { state: 'visible' });
 
   await page.fill('#m-date', '05-04-2026');
   await page.fill('#m-item', 'Cucumber');
-  await page.fill('#m-supplier', 'Local Market');
+  await page.fill('#m-sup', 'Local Market');
   await page.fill('#m-qty', '5');
   await page.fill('#m-rate', '30');
   await page.click('#btn-save');
@@ -63,10 +65,10 @@ test('Journey 3 — Search and filter in Purchase Log', async ({ page }) => {
   await page.waitForTimeout(300);
 
   const before = await page.$$eval('#log-body tr', trs => trs.length);
-  
-  await page.fill('#log-search', 'Tomato');
+
+  await page.fill('#f-search', 'Tomato');
   await page.waitForTimeout(300);
-  
+
   const after = await page.$$eval('#log-body tr', trs => trs.length);
   expect(after).toBeLessThan(before);
   expect(after).toBeGreaterThan(0);
@@ -81,10 +83,10 @@ test('Journey 4 — View trends and switch items', async ({ page }) => {
   await page.evaluate(() => go('trends'));
   await page.waitForTimeout(300);
 
-  const options = await page.$$('#trends-item option');
+  const options = await page.$$('#trend-item-sel option');
   expect(options.length).toBeGreaterThan(1);
 
-  const chart = await page.$('#trends-chart');
+  const chart = await page.$('#chart-item');
   expect(chart).not.toBeNull();
 });
 
@@ -116,7 +118,8 @@ test('Journey 6 — Monthly report filter', async ({ page }) => {
   const options = await page.$$('#monthly-sel option');
   expect(options.length).toBeGreaterThan(1);
 
-  await page.selectOption('#monthly-sel', options[1].getAttribute('value'));
+  const value = await options[1].getAttribute('value');
+  await page.selectOption('#monthly-sel', value);
   await page.waitForTimeout(300);
 
   const rows = await page.$$('#monthly-body tr');
@@ -149,7 +152,7 @@ test('Journey 8 — Export Excel and verify download', async ({ page }) => {
 
   const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
   await page.click('#btn-export');
-  
+
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^SabziTracker_\d{4}-\d{2}-\d{2}\.xlsx$/);
 });
@@ -178,20 +181,26 @@ test('Journey 10 — Scanner: add multiple items and save', async ({ page }) => 
   page.on('dialog', d => d.accept());
 
   await page.evaluate(() => go('scanner'));
+  await page.evaluate(() => {
+    document.getElementById('invoice-preview-wrap').style.display = 'block';
+    document.getElementById('invoice-empty').style.display = 'none';
+    document.getElementById('entry-panel').style.display = 'block';
+    if (!document.querySelector('#scan-rows-body tr')) addScanRow();
+  });
   await page.waitForTimeout(200);
 
   await page.fill('#scan-date', '06-04-2026');
   await page.fill('#scan-supplier', 'Test Supplier');
 
-  await page.fill('#item_1', 'Carrot');
-  await page.fill('#qty_1', '2');
-  await page.fill('#rate_1', '40');
+  await page.fill('#scan-rows-body input[id^="item_"]', 'Carrot');
+  await page.fill('#scan-rows-body input[id^="qty_"]', '2');
+  await page.fill('#scan-rows-body input[id^="rate_"]', '40');
   await page.waitForTimeout(100);
 
   await page.keyboard.press('Tab');
   await page.waitForTimeout(100);
 
-  await page.click('#btn-add-all');
+  await page.click('#add-all-btn');
   await page.waitForTimeout(300);
 
   await page.evaluate(() => go('log'));

@@ -14,7 +14,7 @@ module.exports = defineConfig({
 
   // Run tests in parallel (safe — each test gets its own browser context)
   fullyParallel:  true,
-  workers:        4,
+  workers:        2,
 
   // Fail the run on any test failure
   forbidOnly:     !!process.env.CI,

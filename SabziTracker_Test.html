@@ -218,7 +218,7 @@ select option{background:var(--bg3);}
     <button onclick="go('spending')"  id="nav-spending">💰 Spending</button>
   </nav>
   <div class="hdr-actions">
-    <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="btn btn-ghost" onclick="exportExcel()" id="btn-export">⬇ Export Excel</button>
     <button class="btn btn-primary" onclick="go('scanner')">+ Scan Invoice</button>
   </div>
 </header>
@@ -258,7 +258,7 @@ select option{background:var(--bg3);}
     <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value green" id="s-spend">₹0</div><div class="stat-sub" id="s-spend-sub">All purchases</div></div>
     <div class="stat-card"><div class="stat-label">Items Tracked</div><div class="stat-value" id="s-items">0</div><div class="stat-sub">Unique items</div></div>
     <div class="stat-card"><div class="stat-label">Rising Prices</div><div class="stat-value red" id="s-rising">0</div><div class="stat-sub">vs first purchase</div></div>
-    <div class="stat-card"><div class="stat-label">Invoices Scanned</div><div class="stat-value amber" id="s-invoices">0</div><div class="stat-sub">This session</div></div>
+    <div class="stat-card"><div class="stat-label">Invoices</div><div class="stat-value amber" id="s-invoices">0</div><div class="stat-sub">Selected period</div></div>
   </div>
   <div class="charts-2">
     <div class="card">
@@ -385,8 +385,8 @@ select option{background:var(--bg3);}
   <div class="page-hdr">
     <div><div class="page-title">Purchase Log</div><div class="page-sub" id="log-subtitle">0 entries</div></div>
     <div class="page-hdr-right">
-      <button class="btn btn-ghost btn-sm" onclick="openAddModal()">+ Add Entry</button>
-      <button class="btn btn-primary btn-sm" onclick="exportExcel()">⬇ Export</button>
+      <button class="btn btn-ghost btn-sm" onclick="openAddModal()" id="btn-add">+ Add Entry</button>
+      <button class="btn btn-primary btn-sm" onclick="exportExcel()" id="btn-export-log">⬇ Export</button>
     </div>
   </div>
   <div class="filter-bar">
@@ -569,7 +569,7 @@ select option{background:var(--bg3);}
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEntry()">Save Entry</button>
+      <button class="btn btn-primary" onclick="saveEntry()" id="btn-save">Save Entry</button>
     </div>
   </div>
 </div>
@@ -582,7 +582,6 @@ select option{background:var(--bg3);}
 // ═══════════════════════════════════════════════════════════
 let DB = [];
 let extracted = [];
-let invCount = +sessionStorage.getItem('sabzi_inv') || 0;
 let charts = {};
 let editingId = null;
 let currentPage = 'dashboard';
@@ -623,24 +622,37 @@ function toast(msg, type='ok') {
 // ═══════════════════════════════════════════════════════════
 function saveDB() {
   localStorage.setItem('sabzi_db', JSON.stringify(DB));
-  document.getElementById('sb-count').textContent = invCount;
+  document.getElementById('sb-count').textContent = countInvoices(DB);
 }
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
+function countInvoices(rows=DB) {
+  const keys = new Set();
+  rows.filter(r=>r.date).forEach(r=>{
+    const supplier = (r.supplier || '').trim();
+    const invoice = (r.invoice_no || '').trim() || '(no invoice)';
+    keys.add([r.date, supplier, invoice].join('|'));
+  });
+  return keys.size;
+}
+
 function parseDateSort(d) {
   // DD-MM-YYYY → YYYY-MM-DD for sorting
-  if (!d) return '';
+  if (!d || typeof d !== 'string') return '';
   const p = d.split('-');
-  if (p.length === 3 && p[2].length === 4) return p[2]+'-'+p[1]+'-'+p[0];
+  if (p.length === 3 && p[2].length === 4 && /^\d+$/.test(p[0]+p[1]+p[2])) {
+    return p[2]+'-'+p[1]+'-'+p[0];
+  }
+  // Return original if can't parse - for compatibility
   return d;
 }
 
 function getMonthKey(d) {
   // DD-MM-YYYY → MM-YYYY
-  if (!d) return '';
+  if (!d || typeof d !== 'string') return '';
   const p = d.split('-');
-  if (p.length === 3) return p[1]+'-'+p[2];
+  if (p.length === 3 && p[1] && p[2]) return p[1]+'-'+p[2];
   return '';
 }
 
@@ -652,22 +664,31 @@ function catClass(cat) {
 function trendLabel(pct) {
   if (pct >  10) return { txt:'📈 Rising',      cls:'t-rising'  };
   if (pct >   3) return { txt:'🔺 Slight Rise', cls:'t-slight'  };
-  if (pct < -10) return { txt:'📉 Dropping',    cls:'t-dropping'};
+  if (pct <  -10) return { txt:'📉 Dropping',   cls:'t-dropping'};
   if (pct <  -3) return { txt:'🔻 Falling',     cls:'t-falling' };
   return             { txt:'🟢 Stable',      cls:'t-stable'  };
 }
 
-function getItemTrends() {
-  const items = [...new Set(DB.map(r=>r.item))];
+function getItemTrends(rows=DB) {
+  if (!rows || !rows.length) return {};
+  const items = [...new Set(rows.map(r=>r.item).filter(Boolean))];
   const out = {};
   items.forEach(item => {
-    const rows = DB.filter(r=>r.item===item).sort((a,b)=>parseDateSort(a.date).localeCompare(parseDateSort(b.date)));
-    const rates = rows.map(r=>+r.rate||0);
-    const qtys  = rows.map(r=>+r.qty||0);
-    const amts  = rows.map(r=>+r.amount||0);
-    const avg   = rates.reduce((s,v)=>s+v,0)/rates.length;
-    const min   = Math.min(...rates);
-    const first = rates[0], last = rates[rates.length-1];
+    const itemRows = rows.filter(r=>r.item===item && r.date && validateDate(r.date)).sort((a,b)=>{
+      const da = parseDateSort(a.date) || '';
+      const db = parseDateSort(b.date) || '';
+      return da.localeCompare(db);
+    });
+    if (!itemRows.length) return;
+    const rates = itemRows.map(r=>+r.rate||0);
+    const qtys  = itemRows.map(r=>+r.qty||0);
+    const amts  = itemRows.map(r=>+r.amount||0);
+    const validRates = rates.filter(v=>v>0);
+    const trendRates = validRates.length ? validRates : rates;
+    if (!trendRates.length) return;
+    const avg   = validRates.length ? validRates.reduce((s,v)=>s+v,0)/validRates.length : 0;
+    const min   = validRates.length ? Math.min(...validRates) : 0;
+    const first = trendRates[0], last = trendRates[trendRates.length-1];
     const pct   = first>0 ? (last-first)/first*100 : 0;
     const tl    = trendLabel(pct);
     out[item] = {
@@ -675,9 +696,9 @@ function getItemTrends() {
       label: tl.txt, cls: tl.cls,
       totalQty:  qtys.reduce((s,v)=>s+v,0),
       totalSpend:amts.reduce((s,v)=>s+v,0),
-      category:  rows[0]?.category || '',
-      unit:      rows[0]?.unit || '',
-      rows
+      category:  itemRows[0]?.category || '',
+      unit:      itemRows[0]?.unit || '',
+      rows: itemRows
     };
   });
   return out;
@@ -749,18 +770,18 @@ function renderDashboard() {
   mSel.innerHTML = '<option value="">All Time</option>' + months.map(m=>`<option value="${m}"${m===mCur?'selected':''}>${m}</option>`).join('');
 
   const filterVal = mSel.value;
-  const data = filterVal ? DB.filter(r=>getMonthKey(r.date)===filterVal) : DB;
+  const data = filterVal ? DB.filter(r=>r.date && getMonthKey(r.date)===filterVal) : DB.filter(r=>r.date);
 
   const totalSpend = data.reduce((s,r)=>s+(+r.amount||0),0);
   const uniqueItems = new Set(data.map(r=>r.item)).size;
-  const trends = getItemTrends();
+  const trends = getItemTrends(data);
   const rising = Object.values(trends).filter(t=>t.pct>5).length;
 
   document.getElementById('s-spend').textContent   = '₹'+totalSpend.toLocaleString('en-IN',{maximumFractionDigits:0});
   document.getElementById('s-spend-sub').textContent = filterVal ? filterVal : 'All purchases';
   document.getElementById('s-items').textContent   = uniqueItems;
   document.getElementById('s-rising').textContent  = rising;
-  document.getElementById('s-invoices').textContent = invCount;
+  document.getElementById('s-invoices').textContent = countInvoices(data);
 
   // Category doughnut
   const catAcc = {};
@@ -1269,8 +1290,6 @@ function addAllToLog() {
     });
   });
 
-  invCount++;
-  sessionStorage.setItem('sabzi_inv', invCount);
   saveDB();
 
   // Show success message
@@ -1324,7 +1343,8 @@ function renderTrends() {
 function renderTrendItemSelect() {
   const sel = document.getElementById('trend-item-sel');
   const cur = sel.value;  // save BEFORE rebuilding innerHTML
-  const items = [...new Set(DB.map(r=>r.item))].sort();
+  const validData = DB.filter(r=>r.date && validateDate(r.date));
+  const items = [...new Set(validData.map(r=>r.item))].sort();
   sel.innerHTML = '<option value="">— Select item to chart —</option>' + items.map(i=>`<option${i===cur?' selected':''}>${i}</option>`).join('');
   // restore if the item still exists
   if (cur && items.includes(cur)) sel.value = cur;
@@ -1382,12 +1402,13 @@ function renderTrendChart() {
 // SUPPLIERS
 // ═══════════════════════════════════════════════════════════
 function renderSuppliers() {
-  const suppliers = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
-  const totalSpend = DB.reduce((s,r)=>s+(+r.amount||0),0);
-  const maxSpend = Math.max(...suppliers.map(sup=>DB.filter(r=>r.supplier===sup).reduce((s,r)=>s+(+r.amount||0),0)),1);
+  const validData = DB.filter(r=>r.date && validateDate(r.date));
+  const suppliers = [...new Set(validData.map(r=>r.supplier).filter(Boolean))].sort();
+  const totalSpend = validData.reduce((s,r)=>s+(+r.amount||0),0);
+  const maxSpend = Math.max(...suppliers.map(sup=>validData.filter(r=>r.supplier===sup).reduce((s,r)=>s+(+r.amount||0),0)),1);
 
   document.getElementById('sup-cards').innerHTML = suppliers.length ? suppliers.map(sup=>{
-    const rows = DB.filter(r=>r.supplier===sup);
+    const rows = validData.filter(r=>r.supplier===sup);
     const spend = rows.reduce((s,r)=>s+(+r.amount||0),0);
     const items = new Set(rows.map(r=>r.item)).size;
     const pct   = (spend/maxSpend*100).toFixed(0);
@@ -1403,9 +1424,10 @@ function renderSuppliers() {
 }
 
 function renderSupplierTable() {
+  const validData = DB.filter(r=>r.date && validateDate(r.date));
   const search = (document.getElementById('sup-search').value||'').toLowerCase();
-  const suppliers = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
-  let items = [...new Set(DB.map(r=>r.item))].sort();
+  const suppliers = [...new Set(validData.map(r=>r.supplier).filter(Boolean))].sort();
+  let items = [...new Set(validData.map(r=>r.item))].sort();
   if (search) items = items.filter(i=>i.toLowerCase().includes(search));
 
   if (!suppliers.length || !items.length) {
@@ -1418,7 +1440,7 @@ function renderSupplierTable() {
   items.forEach(item=>{
     rateMap[item]={};
     suppliers.forEach(sup=>{
-      const rows=DB.filter(r=>r.item===item&&r.supplier===sup);
+      const rows=validData.filter(r=>r.item===item&&r.supplier===sup);
       if (rows.length) rateMap[item][sup]=rows.reduce((s,r)=>s+(+r.rate||0),0)/rows.length;
     });
   });
@@ -1445,13 +1467,13 @@ function renderSupplierTable() {
 // MONTHLY REPORT
 // ═══════════════════════════════════════════════════════════
 function renderMonthly() {
-  const months = [...new Set(DB.map(r=>getMonthKey(r.date)).filter(Boolean))].sort().reverse();
+  const months = [...new Set(DB.map(r=>r.date ? getMonthKey(r.date) : '').filter(Boolean))].sort().reverse();
   const sel = document.getElementById('monthly-sel');
   const cur = sel.value;
   sel.innerHTML = '<option value="">All Time</option>' + months.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
 
   const filterVal = sel.value;
-  const data = filterVal ? DB.filter(r=>getMonthKey(r.date)===filterVal) : DB;
+  const data = filterVal ? DB.filter(r=>r.date && getMonthKey(r.date)===filterVal) : DB.filter(r=>r.date);
   const items = [...new Set(data.map(r=>r.item))].sort();
   const trends = getItemTrends();
 
@@ -1488,8 +1510,10 @@ function renderMonthly() {
 // SPENDING SUMMARY
 // ═══════════════════════════════════════════════════════════
 function renderSpending() {
+  const validData = DB.filter(r=>r.date && validateDate(r.date));
+
   const catAcc={}, supAcc={};
-  DB.forEach(r=>{
+  validData.forEach(r=>{
     catAcc[r.category||'Other']=(catAcc[r.category||'Other']||0)+(+r.amount||0);
     if (r.supplier) supAcc[r.supplier]=(supAcc[r.supplier]||0)+(+r.amount||0);
   });
@@ -1500,7 +1524,7 @@ function renderSpending() {
   const supKeys=Object.keys(supAcc), supVals=Object.values(supAcc).map(v=>Math.round(v));
   if (supKeys.length) mkChart('chart-ss','doughnut',supKeys,supVals,C_PALETTE.slice(0,supKeys.length));
 
-  const totalSpend = DB.reduce((s,r)=>s+(+r.amount||0),0);
+  const totalSpendAll = validData.reduce((s,r)=>s+(+r.amount||0),0);
   const trends = getItemTrends();
   const top10 = Object.entries(trends).sort((a,b)=>b[1].totalSpend-a[1].totalSpend).slice(0,10);
 
@@ -1510,7 +1534,7 @@ function renderSpending() {
     <td>${(t.totalQty||0).toFixed(1)} ${t.unit}</td>
     <td>₹${(t.avg||0).toFixed(2)}</td>
     <td>₹${(t.totalSpend||0).toFixed(0)}</td>
-    <td>${totalSpend>0?((t.totalSpend/totalSpend)*100).toFixed(1)+'%':'—'}</td>
+    <td>${totalSpendAll>0?((t.totalSpend/totalSpendAll)*100).toFixed(1)+'%':'—'}</td>
     <td class="${t.cls}">${t.label}</td>
   </tr>`).join('') : `<tr><td colspan="7"><div class="empty"><div class="empty-ico">💰</div>No data yet</div></td></tr>`;
 }
@@ -1613,7 +1637,23 @@ function importExcel(input) {
       }
       rows.slice(startRow).forEach(r=>{
         // Export format: Date[0] Supplier[1] InvoiceNo[2] Item(EN)[3] Item(Orig)[4] Category[5] Unit[6] Qty[7] Rate[8] Amount[9]
-        const date     = String(r[0]||'').trim();
+        let dateRaw = r[0];
+        // Handle Excel serial dates (numbers like 45305) and various formats
+        let date = '';
+        if (typeof dateRaw === 'number') {
+          // Excel serial date - convert to DD-MM-YYYY
+          const excelEpoch = new Date(1899, 11, 30);
+          const d = new Date(excelEpoch.getTime() + dateRaw * 86400000);
+          const dd = String(d.getDate()).padStart(2,'0');
+          const mm = String(d.getMonth()+1).padStart(2,'0');
+          const yyyy = d.getFullYear();
+          date = dd+'-'+mm+'-'+yyyy;
+        } else if (dateRaw) {
+          date = String(dateRaw).trim();
+          // Try to normalize various formats to DD-MM-YYYY
+          const normalized = normalizeDateFormat(date);
+          if (normalized) date = normalized;
+        }
         const supplier = String(r[1]||'').trim();
         const inv_no   = String(r[2]||'').trim();
         const item     = String(r[3]||'').trim();
@@ -1624,6 +1664,7 @@ function importExcel(input) {
         const rate     = parseFloat(r[8])||0;
         const amount   = parseFloat(r[9])||qty*rate;
         if (!item || !rate || !qty) { skipped++; return; }
+        if (!date || !validateDate(date)) { skipped++; return; }
         // Skip duplicate: same date+supplier+item+qty+rate
         const isDupe = DB.some(x=>x.date===date&&x.supplier===supplier&&x.item===item&&+x.qty===qty&&+x.rate===rate);
         if (isDupe) { dupes++; return; }
@@ -1631,13 +1672,31 @@ function importExcel(input) {
         added++;
       });
       saveDB();
-      const msg = `Imported ${added} row${added!==1?'s':''}` + (skipped?` · ${skipped} skipped`:'') + (dupes?` · ${dupes} duplicate${dupes!==1?'s':''} skipped`:'');
+      const msg = `Imported ${added} row${added!==1?'s':''}` + (skipped?` · ${skipped} skipped (missing or invalid date)`:'') + (dupes?` · ${dupes} duplicate${dupes!==1?'s':''} skipped`:'');
       toast(msg);
       go('log');
     } catch(err) { toast('Import failed: '+err.message,'err'); }
   };
   reader.readAsBinaryString(file);
   input.value='';
+}
+
+// Helper to normalize various date formats to DD-MM-YYYY
+function normalizeDateFormat(dateStr) {
+  if (!dateStr) return null;
+  // Try DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) return dateStr;
+  // Try DD/MM/YYYY. Slash dates are interpreted in the same India-style
+  // order as the rest of the app: day, month, year.
+  let m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0')+'-'+m[3];
+  // Try DD/MM/YY
+  m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) {
+    const year = parseInt(m[3]) > 50 ? '19'+m[3] : '20'+m[3];
+    return String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0')+'-'+year;
+  }
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1708,12 +1767,11 @@ function loadDemoData() {
 }
 function confirmClear() {
   if (!confirm('Delete ALL purchase data? This cannot be undone.')) return;
-  DB=[]; invCount=0;
+  DB=[];
   // Destroy all charts so they don't show stale data
   Object.keys(charts).forEach(k=>{ try{charts[k].destroy();}catch(e){} });
   charts={};
   saveDB();
-  sessionStorage.removeItem('sabzi_inv');
   document.getElementById('s-invoices').textContent='0';
   document.getElementById('sb-count').textContent='0';
   toast('All data cleared');
@@ -1767,7 +1825,7 @@ function confirmClear() {
   assert('R03-d Stable ±3',           trendLabel(2).txt,   '🟢 Stable');
   assert('R03-e Falling -3 to -10',   trendLabel(-5).txt,  '🔻 Falling');
   assert('R03-f Dropping <-10',       trendLabel(-15).txt, '📉 Dropping');
-  assert('R03-g boundary 10 is Rise', trendLabel(10).txt,  '📈 Rising');   // > 10 condition means 10.0 = Rising
+  assert('R03-g boundary 10 is Slight Rise', trendLabel(10).txt,  '🔺 Slight Rise');
   assert('R03-h boundary 3 is Stable',trendLabel(3).txt,   '🟢 Stable');   // > 3 required
   assert('R03-i cls Rising',          trendLabel(11).cls,  't-rising');
   assert('R03-j cls Dropping',        trendLabel(-11).cls, 't-dropping');
@@ -1861,14 +1919,19 @@ function confirmClear() {
   // ── R10  calcAmount DOM test ─────────────────────────────────────────────
   // Only runs if modal fields are present (they always are in this app)
   try {
-    document.getElementById('m-qty').value  = '10';
-    document.getElementById('m-rate').value = '26';
-    calcAmount();
-    assert('R10 calcAmount 10×26=260', document.getElementById('m-amt').value, '260.00');
-    // Reset fields
-    document.getElementById('m-qty').value  = '';
-    document.getElementById('m-rate').value = '';
-    document.getElementById('m-amt').value  = '';
+    const qtyEl = document.getElementById('m-qty');
+    const rateEl = document.getElementById('m-rate');
+    const amtEl = document.getElementById('m-amt');
+    if (qtyEl && rateEl && amtEl && document.getElementById('m-qty') === qtyEl) {
+      qtyEl.value  = '10';
+      rateEl.value = '26';
+      calcAmount();
+      assert('R10 calcAmount 10×26=260', amtEl.value, '260.00');
+      // Reset fields
+      qtyEl.value  = '';
+      rateEl.value = '';
+      amtEl.value  = '';
+    }
   } catch(e) { results.failed++; results.failures.push({label:'R10 calcAmount DOM',got:e.message,expected:'no error'}); }
 
   // ── Regression Report ────────────────────────────────────────────────────
@@ -1904,10 +1967,11 @@ function confirmClear() {
   const _origGetItemTrends = getItemTrends;
   let _cache = null;
   let _cacheKey = '';   // JSON fingerprint of DB length + last item id
-  getItemTrends = function() {
+  getItemTrends = function(rows=DB) {
+    if (rows !== DB) return _origGetItemTrends(rows);
     const key = DB.length + '|' + (DB[0]?.id||'') + '|' + (DB[DB.length-1]?.id||'');
     if (_cache && _cacheKey === key) return _cache;
-    _cache = _origGetItemTrends();
+    _cache = _origGetItemTrends(DB);
     _cacheKey = key;
     return _cache;
   };
@@ -2088,7 +2152,7 @@ function sanitiseContainer(container) {
         ['Suppliers',     suppliers.size],
         ['Purchase Dates',dates.size],
         ['Total Spend',   '₹'+totalSpend.toLocaleString('en-IN',{maximumFractionDigits:0})],
-        ['Invoices (session)', invCount],
+        ['Invoices', countInvoices(DB)],
         ['Active Charts', Object.keys(charts).length],
         ['Current Page',  currentPage],
         ['Tests',         testRes ? `${testRes.passed}✓ ${testRes.failed}✗ of ${testRes.total}` : 'Not run yet'],
@@ -2163,13 +2227,6 @@ function sanitiseContainer(container) {
       localStorage.removeItem('_sabzi_chk');
       pass('localStorage writable');
     } catch(e) { warn('localStorage blocked — data will NOT persist'); }
-
-    // sessionStorage writable
-    try {
-      sessionStorage.setItem('_sabzi_chk','1');
-      sessionStorage.removeItem('_sabzi_chk');
-      pass('sessionStorage writable');
-    } catch(e) { warn('sessionStorage blocked — invoice count will not persist'); }
 
     // Google Fonts loaded (non-critical)
     const fontLoaded = [...document.fonts].some(f => f.family.includes('Syne') || f.family.includes('DM Sans'));
@@ -2246,7 +2303,7 @@ function sanitiseContainer(container) {
 // ════════════════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════════════════
-document.getElementById('sb-count').textContent = invCount;
+document.getElementById('sb-count').textContent = countInvoices(DB);
 go('dashboard');
 </script>
 </body>

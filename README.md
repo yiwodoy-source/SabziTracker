@@ -2,6 +2,9 @@
 
 Complete testing and hardening infrastructure for `SabziTracker_Production.html`.
 
+Detailed implementation structure and data flow are documented in
+[`docs/ARCHITECTURE_FLOW.md`](docs/ARCHITECTURE_FLOW.md).
+
 ---
 
 ## File Structure

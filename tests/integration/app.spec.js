@@ -9,9 +9,8 @@ async function withDemo(page) {
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
   page.on('dialog', d => d.accept());
   await page.evaluate(() => {
-    const origGo = go;
     loadDemoData();
-    origGo('dashboard');
+    go('dashboard');
   });
   await page.waitForSelector('#s-spend');
 }
@@ -45,6 +44,30 @@ test.describe('Dashboard', () => {
     const cards = await page.$$('.stat-card');
     expect(cards.length).toBeGreaterThan(0);
   });
+
+  test('month filter scopes dashboard metrics to selected month', async ({ page }) => {
+    await withDemo(page);
+    await page.selectOption('#dash-month', '03-2026');
+    await page.waitForTimeout(150);
+
+    const stats = await page.evaluate(() => ({
+      spend: document.querySelector('#s-spend').textContent,
+      items: document.querySelector('#s-items').textContent,
+      invoices: document.querySelector('#s-invoices').textContent,
+      expected: {
+        spend: DB
+          .filter(r => getMonthKey(r.date) === '03-2026')
+          .reduce((s,r) => s + (+r.amount || 0), 0)
+          .toLocaleString('en-IN', { maximumFractionDigits: 0 }),
+        items: new Set(DB.filter(r => getMonthKey(r.date) === '03-2026').map(r => r.item)).size,
+        invoices: countInvoices(DB.filter(r => getMonthKey(r.date) === '03-2026')),
+      }
+    }));
+
+    expect(stats.spend).toContain(stats.expected.spend);
+    expect(stats.items).toBe(String(stats.expected.items));
+    expect(stats.invoices).toBe(String(stats.expected.invoices));
+  });
 });
 
 test.describe('Purchase Log', () => {
@@ -54,7 +77,7 @@ test.describe('Purchase Log', () => {
     await page.waitForTimeout(200);
 
     const before = await page.$$eval('#log-body tr', trs => trs.length);
-    await page.fill('#log-search', 'Tomato');
+    await page.fill('#f-search', 'Tomato');
     await page.waitForTimeout(250);
 
     const after = await page.$$eval('#log-body tr', trs => trs.length);
@@ -66,7 +89,7 @@ test.describe('Purchase Log', () => {
     await page.evaluate(() => go('log'));
     await page.waitForTimeout(200);
 
-    await page.selectOption('#log-month', '');
+    await page.selectOption('#f-date', '');
     const rows = await page.$$('#log-body tr');
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -78,8 +101,8 @@ test.describe('Trends', () => {
     await page.evaluate(() => go('trends'));
     await page.waitForTimeout(200);
 
-    const table = await page.$('#trends-table');
-    expect(table).not.toBeNull();
+    const rows = await page.$$('#trend-summary-body tr');
+    expect(rows.length).toBeGreaterThan(0);
   });
 
   test('item selector populated', async ({ page }) => {
@@ -87,7 +110,7 @@ test.describe('Trends', () => {
     await page.evaluate(() => go('trends'));
     await page.waitForTimeout(200);
 
-    const options = await page.$$('#trends-item option');
+    const options = await page.$$('#trend-item-sel option');
     expect(options.length).toBeGreaterThan(1);
   });
 });
@@ -96,6 +119,10 @@ test.describe('Scanner', () => {
   test('adds new row on load', async ({ page }) => {
     await withDemo(page);
     await page.evaluate(() => go('scanner'));
+    await page.evaluate(() => {
+      document.getElementById('entry-panel').style.display = 'block';
+      if (!document.querySelector('#scan-rows-body tr')) addScanRow();
+    });
     await page.waitForTimeout(200);
 
     const rows = await page.$$('#scan-rows-body tr');
@@ -105,13 +132,17 @@ test.describe('Scanner', () => {
   test('auto-calculates amount on qty/rate change', async ({ page }) => {
     await withDemo(page);
     await page.evaluate(() => go('scanner'));
+    await page.evaluate(() => {
+      document.getElementById('entry-panel').style.display = 'block';
+      if (!document.querySelector('#scan-rows-body tr')) addScanRow();
+    });
     await page.waitForTimeout(200);
 
-    await page.fill('#qty_1', '10');
-    await page.fill('#rate_1', '25');
+    await page.fill('#scan-rows-body input[id^="qty_"]', '10');
+    await page.fill('#scan-rows-body input[id^="rate_"]', '25');
     await page.waitForTimeout(100);
 
-    const amt = await page.inputValue('#amt_1');
+    const amt = await page.inputValue('#scan-rows-body input[id^="amt_"]');
     expect(amt).toBe('250.00');
   });
 });
@@ -171,10 +202,10 @@ test.describe('Spending Summary', () => {
 test.describe('Excel Export', () => {
   test('export button triggers download', async ({ page }) => {
     await withDemo(page);
-    
+
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
     await page.click('#btn-export');
-    
+
     const download = await downloadPromise;
     if (download) {
       expect(download.suggestedFilename()).toContain('SabziTracker_');
@@ -205,7 +236,7 @@ test.describe('Health Panel', () => {
 test.describe('Error Handling', () => {
   test('toast displays on error', async ({ page }) => {
     await withDemo(page);
-    
+
     page.on('dialog', async dialog => {
       expect(dialog.message()).toContain('error');
       await dialog.accept();
