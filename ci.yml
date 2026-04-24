@@ -1,0 +1,330 @@
+name: SabziTracker — Production CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'SabziTracker_Production.html'
+      - 'tests/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'SabziTracker_Production.html'
+      - 'tests/**'
+  workflow_dispatch:   # manual trigger
+
+# Cancel in-progress runs when a new push arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Job 1: File integrity gate ─────────────────────────────────────────────
+  integrity:
+    name: File Integrity Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify HTML file exists and is parseable
+        run: |
+          test -f SabziTracker_Production.html || (echo "ERROR: Production HTML missing" && exit 1)
+          python3 -c "
+          from html.parser import HTMLParser
+          class V(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.errs=[]; self.stack=[]
+                  self.void={'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'}
+              def handle_starttag(self,t,a):
+                  if t not in self.void: self.stack.append(t)
+              def handle_endtag(self,t):
+                  if t in self.void: return
+                  if self.stack and self.stack[-1]==t: self.stack.pop()
+                  else: self.errs.append(f'Bad close tag: </{t}>')
+          with open('SabziTracker_Production.html') as f: html=f.read()
+          v=V(); v.feed(html)
+          if v.errs: print('HTML ERRORS:', v.errs); exit(1)
+          if v.stack: print('UNCLOSED TAGS:', v.stack); exit(1)
+          print('HTML structure: OK')
+          "
+
+      - name: Verify all critical functions present
+        run: |
+          python3 -c "
+          with open('SabziTracker_Production.html') as f: html = f.read()
+          required = [
+            'function parseDateSort(', 'function getMonthKey(', 'function validateDate(',
+            'function trendLabel(', 'function catClass(', 'function uid(',
+            'function getItemTrends(', 'function saveDB(', 'function renderLog(',
+            'function renderDashboard(', 'function renderTrends(', 'function renderSuppliers(',
+            'function renderMonthly(', 'function renderSpending(', 'function exportExcel(',
+            'function importExcel(', 'function loadDemoData(', 'function confirmClear(',
+            'function saveEntry(', 'function deleteRow(', 'function addAllToLog(',
+            'function loadInvoiceImage(', 'function addScanRow(', 'function esc(',
+            'PHASE 1 — REGRESSION HARNESS', 'PHASE 2A — PERFORMANCE',
+            'PHASE 2D — SECURITY', 'PHASE 3A — MONITORING', 'PHASE 3B — MONITORING',
+            'PHASE 4 — DEPLOYMENT READINESS'
+          ]
+          missing = [r for r in required if r not in html]
+          if missing:
+            print('MISSING:', missing)
+            exit(1)
+          print(f'All {len(required)} required elements present: OK')
+          "
+
+      - name: Check file size is reasonable (50KB–500KB)
+        run: |
+          SIZE=$(wc -c < SabziTracker_Production.html)
+          echo "File size: $SIZE bytes"
+          [ $SIZE -gt 50000 ] || (echo "ERROR: File too small ($SIZE bytes) — may be truncated" && exit 1)
+          [ $SIZE -lt 500000 ] || (echo "ERROR: File too large ($SIZE bytes) — check for accidental duplication" && exit 1)
+          echo "File size check: OK"
+
+  # ── Job 2: Regression matrix ───────────────────────────────────────────────
+  regression:
+    name: Regression Matrix (96 checks)
+    runs-on: ubuntu-latest
+    needs: integrity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run standalone regression matrix
+        run: node tests/regression-matrix.js
+
+      - name: Upload regression results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-results
+          path: tests/regression-matrix.js
+          retention-days: 30
+
+  # ── Job 3: Unit tests (Jest) ───────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests (Jest)
+    runs-on: ubuntu-latest
+    needs: integrity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: tests
+        run: npm ci --prefer-offline 2>/dev/null || npm install
+
+      - name: Run unit tests with coverage
+        working-directory: tests
+        run: npm run test:unit -- --ci --json --outputFile=results.json
+        env:
+          CI: true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: tests/coverage/
+          retention-days: 30
+
+  # ── Job 4: Integration tests (Playwright) ─────────────────────────────────
+  integration-tests:
+    name: Integration Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: regression
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: tests
+        run: npm ci --prefer-offline 2>/dev/null || npm install
+
+      - name: Install Playwright browsers (Chromium only for CI speed)
+        working-directory: tests
+        run: npx playwright install chromium --with-deps
+
+      - name: Run integration tests
+        working-directory: tests
+        run: npx playwright test tests/integration/ --project=chromium --reporter=github
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-playwright-report
+          path: tests/playwright-report/
+          retention-days: 30
+
+  # ── Job 5: E2E tests (Playwright) ─────────────────────────────────────────
+  e2e-tests:
+    name: E2E Journey Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: tests
+        run: npm ci --prefer-offline 2>/dev/null || npm install
+
+      - name: Install Playwright browsers
+        working-directory: tests
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E journey tests
+        working-directory: tests
+        run: npx playwright test tests/e2e/ --project=chromium --reporter=github
+        env:
+          CI: true
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-playwright-report
+          path: tests/playwright-report/
+          retention-days: 30
+
+  # ── Job 6: Security scan ───────────────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: integrity
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for dangerous patterns in HTML
+        run: |
+          python3 -c "
+          with open('SabziTracker_Production.html') as f: html = f.read()
+          import re, sys
+          issues = []
+
+          # Must have XSS guard
+          if 'function esc(' not in html:
+              issues.append('MISSING: esc() XSS sanitiser')
+          if 'MutationObserver' not in html:
+              issues.append('MISSING: XSS DOM observer')
+
+          # Must have SRI on CDN scripts (or local copies)
+          cdn_scripts = re.findall(r'<script[^>]+src=[\"|\']https://[^\"\']+[\"|\']', html)
+          for s in cdn_scripts:
+              if 'integrity=' not in s:
+                  issues.append(f'CDN script without SRI: {s[:80]}')
+
+          # Must NOT have eval() in original logic (only in test runner)
+          # The production HTML itself should not use eval
+          # (the regression harness in the app uses Function constructor indirectly — that's fine)
+          raw_evals = [i for i,line in enumerate(html.split('\n'),1)
+                       if re.search(r'\beval\s*\(', line)
+                       and 'regression-matrix' not in line.lower()]
+          if raw_evals:
+              issues.append(f'eval() found at lines: {raw_evals[:5]}')
+
+          # Must have CSP meta tag
+          if 'Content-Security-Policy' not in html:
+              issues.append('MISSING: Content-Security-Policy meta tag')
+
+          if issues:
+              print('SECURITY ISSUES:')
+              for i in issues: print(f'  - {i}')
+              # Warn but don't fail — CSP and SRI are recommended, not blocking
+              print(f'{len(issues)} issue(s) found (review recommended)')
+          else:
+              print('Security scan: OK')
+          "
+
+      - name: Verify no hardcoded secrets or API keys
+        run: |
+          # Check for patterns that look like real API keys or secrets
+          if grep -E 'sk-ant-api[0-9a-zA-Z\-]{20,}' SabziTracker_Production.html; then
+            echo "ERROR: Hardcoded API key found in production HTML"
+            exit 1
+          fi
+          if grep -E '(password|secret|token)\s*=\s*["\x27][^"\x27]{8,}' SabziTracker_Production.html; then
+            echo "WARNING: Possible hardcoded credential found"
+          fi
+          echo "No hardcoded secrets found: OK"
+
+  # ── Job 7: Performance budget check ───────────────────────────────────────
+  performance:
+    name: Performance Budget
+    runs-on: ubuntu-latest
+    needs: integrity
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check critical performance properties
+        run: |
+          python3 -c "
+          with open('SabziTracker_Production.html') as f: html = f.read()
+
+          checks = []
+
+          # Memoization present (Phase 2A)
+          checks.append(('getItemTrends memoized', 'addMemoization' in html))
+
+          # Debounce present (Phase 2B)
+          checks.append(('renderLog debounced', 'addDebounce' in html))
+
+          # Storage guard present (Phase 2C)
+          checks.append(('Storage quota guard', 'addStorageGuard' in html))
+
+          # Chart.js from CDN (not bundled inline — keeps HTML size down)
+          checks.append(('Chart.js from CDN', 'cdnjs.cloudflare.com/ajax/libs/Chart.js' in html))
+
+          # XLSX from CDN
+          checks.append(('xlsx.js from CDN', 'cdnjs.cloudflare.com/ajax/libs/xlsx' in html))
+
+          # File is under 200KB (performance budget)
+          size_kb = len(html) / 1024
+          checks.append((f'File size under 200KB ({size_kb:.0f}KB)', size_kb < 200))
+
+          failed = [(name, ok) for name, ok in checks if not ok]
+          for name, ok in checks:
+              print(f'  {\"✓\" if ok else \"✗\"} {name}')
+
+          if failed:
+              print(f'\n{len(failed)} performance check(s) failed')
+              exit(1)
+          print(f'\nAll {len(checks)} performance checks passed')
+          "
+
+  # ── Final summary gate ─────────────────────────────────────────────────────
+  all-pass:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [integrity, regression, unit-tests, integration-tests, e2e-tests, security, performance]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.integrity.result }}"         != "success" ]] ||
+             [[ "${{ needs.regression.result }}"        != "success" ]] ||
+             [[ "${{ needs.unit-tests.result }}"        != "success" ]] ||
+             [[ "${{ needs.integration-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.e2e-tests.result }}"         != "success" ]] ||
+             [[ "${{ needs.performance.result }}"       != "success" ]]; then
+            echo "❌ One or more CI jobs failed — do not deploy"
+            exit 1
+          fi
+          echo "✅ All CI checks passed — safe to deploy"

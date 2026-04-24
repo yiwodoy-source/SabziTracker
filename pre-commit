@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# =============================================================================
+# .git/hooks/pre-commit — SabziTracker Pre-Commit Hook
+#
+# Installation (run once from repo root):
+#   cp tests/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# What it does:
+#   1. Checks the HTML file is not accidentally modified in a logic-breaking way
+#   2. Runs the standalone regression matrix (96 checks, ~2 seconds)
+#   3. Blocks commit if any check fails
+#
+# To skip in an emergency (not recommended):
+#   git commit --no-verify -m "emergency fix"
+# =============================================================================
+
+set -e
+
+BOLD='\033[1m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RESET='\033[0m'
+
+HTML="SabziTracker_Production.html"
+MATRIX="tests/regression-matrix.js"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  SabziTracker Pre-Commit Checks"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ── Check 1: HTML file staged? ────────────────────────────────────────────────
+if ! git diff --cached --name-only | grep -q "$HTML"; then
+  echo -e "  ${GREEN}✓${RESET} $HTML not in this commit — skipping regression"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  exit 0
+fi
+
+echo -e "  ${YELLOW}→${RESET} $HTML is staged — running regression checks..."
+echo ""
+
+# ── Check 2: Node.js available ───────────────────────────────────────────────
+if ! command -v node &> /dev/null; then
+  echo -e "  ${YELLOW}⚠${RESET}  Node.js not found — skipping regression matrix"
+  echo "  Install Node.js to enable pre-commit regression checks."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  exit 0
+fi
+
+# ── Check 3: Regression matrix exists ────────────────────────────────────────
+if [ ! -f "$MATRIX" ]; then
+  echo -e "  ${YELLOW}⚠${RESET}  tests/regression-matrix.js not found — skipping"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  exit 0
+fi
+
+# ── Check 4: HTML structural integrity ───────────────────────────────────────
+echo -n "  Checking HTML structure... "
+STRUCT=$(python3 -c "
+from html.parser import HTMLParser
+class V(HTMLParser):
+    def __init__(self):
+        super().__init__(); self.errs=[]; self.stack=[]
+        self.void={'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'}
+    def handle_starttag(self,t,a):
+        if t not in self.void: self.stack.append(t)
+    def handle_endtag(self,t):
+        if t in self.void: return
+        if self.stack and self.stack[-1]==t: self.stack.pop()
+        else: self.errs.append(t)
+with open('$HTML') as f: html=f.read()
+v=V(); v.feed(html)
+errs = v.errs + v.stack
+print('OK' if not errs else 'FAIL:' + ','.join(errs[:5]))
+" 2>&1)
+
+if [[ "$STRUCT" == "OK" ]]; then
+  echo -e "${GREEN}OK${RESET}"
+else
+  echo -e "${RED}FAIL${RESET}"
+  echo -e "  ${RED}✗${RESET} HTML structure error: $STRUCT"
+  echo -e "  ${RED}✗${RESET} Commit blocked — fix HTML structure first"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+# ── Check 5: Required functions still present ─────────────────────────────────
+echo -n "  Checking required functions... "
+FNAMES=$(python3 -c "
+with open('$HTML') as f: html=f.read()
+required=['function parseDateSort(','function getItemTrends(','function validateDate(',
+          'function trendLabel(','function catClass(','function saveDB(',
+          'function exportExcel(','function renderLog(','function addAllToLog(',
+          'function esc(','PHASE 1','PHASE 3B']
+missing=[r for r in required if r not in html]
+print('OK' if not missing else 'MISSING:' + '|'.join(missing))
+" 2>&1)
+
+if [[ "$FNAMES" == "OK" ]]; then
+  echo -e "${GREEN}OK${RESET}"
+else
+  echo -e "${RED}FAIL${RESET}"
+  echo -e "  ${RED}✗${RESET} $FNAMES"
+  echo -e "  ${RED}✗${RESET} Commit blocked — critical functions were removed"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+# ── Check 6: Regression matrix ────────────────────────────────────────────────
+echo "  Running regression matrix (96 checks)..."
+echo ""
+if node "$MATRIX"; then
+  echo -e "  ${GREEN}${BOLD}✓ All checks passed — commit allowed${RESET}"
+else
+  echo ""
+  echo -e "  ${RED}${BOLD}✗ Regression failures — commit blocked${RESET}"
+  echo -e "  ${RED}  Fix the failures above before committing.${RESET}"
+  echo -e "  ${YELLOW}  To skip (emergency only): git commit --no-verify${RESET}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+exit 0

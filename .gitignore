@@ -1,0 +1,13 @@
+node_modules/
+test-results/
+playwright-report/
+coverage/
+
+.DS_Store
+Thumbs.db
+
+.claude/
+.cursor/
+.code-review-graph/
+
+nul

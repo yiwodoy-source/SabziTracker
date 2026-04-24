@@ -1,0 +1,178 @@
+name: SabziTracker — Production CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'SabziTracker_Production.html'
+      - 'tests/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'SabziTracker_Production.html'
+      - 'tests/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  integrity:
+    name: File Integrity Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify HTML file exists and is parseable
+        run: |
+          test -f SabziTracker_Production.html || (echo "ERROR: Production HTML missing" && exit 1)
+          python3 -c "
+          from html.parser import HTMLParser
+          class V(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.errs=[]; self.stack=[]
+                  self.void={'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'}
+              def handle_starttag(self,t,a):
+                  if t not in self.void: self.stack.append(t)
+              def handle_endtag(self,t):
+                  if t in self.void: return
+                  if self.stack and self.stack[-1]==t: self.stack.pop()
+                  else: self.errs.append(f'Bad close tag: </{t}>')
+          with open('SabziTracker_Production.html') as f: html=f.read()
+          v=V(); v.feed(html)
+          if v.errs: print('HTML ERRORS:', v.errs); exit(1)
+          if v.stack: print('UNCLOSED TAGS:', v.stack); exit(1)
+          print('HTML structure: OK')
+          "
+
+      - name: Check file size budget
+        run: |
+          size=$(stat -c%s SabziTracker_Production.html)
+          echo "File size: $size bytes"
+          if [ $size -gt 600000 ]; then
+            echo "ERROR: File exceeds 600KB budget"
+            exit 1
+          fi
+
+      - name: Verify required functions exist
+        run: |
+          grep -q 'function parseDateSort(' SabziTracker_Production.html || exit 1
+          grep -q 'function getItemTrends(' SabziTracker_Production.html || exit 1
+          grep -q 'function validateDate(' SabziTracker_Production.html || exit 1
+          grep -q 'function saveDB(' SabziTracker_Production.html || exit 1
+          grep -q 'function esc(' SabziTracker_Production.html || exit 1
+          echo "All required functions present"
+
+  regression:
+    name: Regression Matrix (96 checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run regression matrix
+        run: node SabziTracker_Production.html
+        shell: bash
+        env:
+          NODE_ENV: test
+
+  unit:
+    name: Unit Tests (Jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run unit tests
+        run: npm test
+
+  integration:
+    name: Integration Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run integration tests
+        run: npx playwright test tests/integration/ --reporter=list
+
+  e2e:
+    name: E2E Journey Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run E2E tests
+        run: npx playwright test tests/e2e/ --reporter=list
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check XSS guard present
+        run: |
+          grep -q 'function esc(' SabziTracker_Production.html || exit 1
+          grep -q 'MutationObserver' SabziTracker_Production.html || exit 1
+          echo "XSS protection: OK"
+
+      - name: Check no hardcoded secrets
+        run: |
+          ! grep -iE '(api_key|password|secret|token)\s*=\s*["\'][^"\']{8,}' SabziTracker_Production.html
+          echo "No hardcoded secrets: OK"
+
+  performance:
+    name: Performance Guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check memoization
+        run: |
+          grep -q '_trendsCache' SabziTracker_Production.html || exit 1
+          echo "Memoization: OK"
+
+      - name: Check debounce
+        run: |
+          grep -q 'setTimeout.*180' SabziTracker_Production.html || exit 1
+          echo "Debounce: OK"
+
+      - name: Check storage guard
+        run: |
+          grep -q '4_000_000' SabziTracker_Production.html || exit 1
+          echo "Storage guard: OK"

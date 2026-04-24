@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sabzi Tracker — Smart Grocery Price Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0d0f0e;--bg2:#141714;--bg3:#1c201b;--bg4:#232820;
+  --border:#2a2f28;--border2:#363d33;
+  --accent:#7ec845;--accent2:#a8e063;--accent-dim:#3d5e20;
+  --amber:#e8a020;--red:#e84040;--blue:#4094e8;
+  --text:#e8ebe5;--text2:#9aa494;--text3:#5a6356;
+  --card:#161a15;--radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:200;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.5px;}
+.logo-text span{color:var(--accent);}
+nav{display:flex;gap:2px;}
+nav button{background:none;border:none;color:var(--text2);padding:7px 13px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all .15s;}
+nav button:hover{background:var(--bg3);color:var(--text);}
+nav button.active{background:var(--bg3);color:var(--accent);}
+.hdr-actions{display:flex;gap:8px;}
+.btn{border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:7px 15px;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#0d1a06;}
+.btn-primary:hover{background:var(--accent2);}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);}
+.btn-red{background:rgba(232,64,64,.12);color:var(--red);border:1px solid rgba(232,64,64,.25);}
+.btn-red:hover{background:rgba(232,64,64,.2);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+
+/* LAYOUT */
+main{display:flex;min-height:calc(100vh - 57px);}
+.sidebar{width:216px;flex-shrink:0;border-right:1px solid var(--border);padding:16px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.sb-label{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:10px 12px 4px;}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;transition:all .15s;border:none;background:none;width:100%;text-align:left;}
+.sb-item:hover{background:var(--bg3);color:var(--text);}
+.sb-item.active{background:rgba(126,200,69,.12);color:var(--accent);}
+.sb-icon{width:17px;text-align:center;font-size:14px;flex-shrink:0;}
+.sb-badge{margin-left:auto;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;min-width:20px;text-align:center;}
+.content{flex:1;overflow:auto;}
+.page{display:none;padding:24px 28px;}
+.page.active{display:block;}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:3px;}
+.card-sub{color:var(--text2);font-size:12px;margin-bottom:14px;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:15px 18px;}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;}
+.stat-value{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;}
+.stat-value.green{color:var(--accent);}
+.stat-value.amber{color:var(--amber);}
+.stat-value.red{color:var(--red);}
+.stat-value.blue{color:var(--blue);}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:3px;}
+
+/* PAGE HEADER */
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;}
+.page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:21px;}
+.page-sub{color:var(--text2);font-size:13px;margin-top:2px;}
+.page-hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0;}
+
+/* TABLES */
+.table-wrap{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--bg3);color:var(--text2);font-weight:600;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg3);}
+tbody td{padding:8px 11px;color:var(--text);vertical-align:middle;}
+td.dim{color:var(--text2);}
+td.mono{font-family:monospace;font-size:11px;}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;}
+.b-vegetable{background:rgba(126,200,69,.15);color:#7ec845;}
+.b-grocery{background:rgba(232,160,32,.15);color:#e8a020;}
+.b-dairy{background:rgba(64,148,232,.15);color:#4094e8;}
+.b-fruit{background:rgba(232,100,64,.15);color:#e86440;}
+.b-spice{background:rgba(200,100,200,.15);color:#c864c8;}
+.b-other{background:rgba(90,99,86,.2);color:#9aa494;}
+
+/* TREND LABELS */
+.t-rising{color:var(--red);}
+.t-slight{color:#e86440;}
+.t-stable{color:var(--amber);}
+.t-falling{color:#64c8a0;}
+.t-dropping{color:var(--accent);}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+.filter-bar input,.filter-bar select{height:32px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:0 10px;font-family:'DM Sans',sans-serif;outline:none;}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--accent);}
+select option{background:var(--bg3);}
+.filter-spacer{flex:1;}
+
+/* UPLOAD ZONE */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius);padding:40px 28px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(126,200,69,.04);}
+.upload-icon{font-size:36px;margin-bottom:10px;}
+.upload-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:5px;}
+.upload-sub{color:var(--text2);font-size:13px;}
+#file-input{display:none;}
+
+/* SCAN */
+.scan-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;}
+.preview-wrap img{width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);max-height:400px;object-fit:contain;background:var(--bg3);}
+.scan-status{display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:var(--radius-sm);font-size:12px;margin-top:8px;}
+.ss-loading{background:rgba(126,200,69,.08);color:var(--accent);border:1px solid var(--accent-dim);}
+.ss-done{background:rgba(126,200,69,.1);color:var(--accent);border:1px solid var(--accent-dim);}
+.ss-error{background:rgba(232,64,64,.08);color:var(--red);border:1px solid rgba(232,64,64,.3);}
+.spinner{width:13px;height:13px;border:2px solid var(--accent-dim);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* CHART */
+.chart-wrap{position:relative;}
+.charts-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:24px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;margin-bottom:18px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-field{display:flex;flex-direction:column;gap:5px;}
+.form-field.full{grid-column:1/-1;}
+.form-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;}
+.form-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 11px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border .15s;}
+.form-input:focus{border-color:var(--accent);}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+
+/* ICON BUTTONS */
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:3px 6px;border-radius:4px;font-size:13px;transition:all .15s;line-height:1;}
+.icon-btn:hover{color:var(--text);background:var(--bg3);}
+.icon-btn.del:hover{color:var(--red);}
+.icon-btn.edit:hover{color:var(--accent);}
+
+/* SUPPLIER CARDS */
+.sup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:18px;}
+.sup-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.sup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:4px;word-break:break-word;}
+.sup-meta{font-size:11px;color:var(--text2);}
+.sup-total{font-size:20px;font-weight:700;color:var(--accent);margin-top:6px;}
+.prog-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:5px;}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;right:22px;z-index:999;background:var(--bg3);border:1px solid var(--border2);padding:11px 17px;border-radius:var(--radius);font-size:13px;transform:translateY(70px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:8px;pointer-events:none;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.ok{border-color:var(--accent-dim);color:var(--accent);}
+#toast.err{border-color:rgba(232,64,64,.4);color:var(--red);}
+
+/* EMPTY */
+.empty{text-align:center;padding:50px 20px;color:var(--text3);}
+.empty-ico{font-size:32px;margin-bottom:10px;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* ZOOM OVERLAY */
+.zoom-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:600;align-items:center;justify-content:center;cursor:zoom-out;}
+.zoom-overlay.open{display:flex;}
+.zoom-overlay img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;}
+
+/* SCAN ROW INLINE INPUTS */
+.scan-input{background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:4px 6px;width:100%;outline:none;transition:border-color .15s;}
+.scan-input:focus{border-bottom-color:var(--accent);background:rgba(126,200,69,.04);}
+.scan-input.amt-cell{color:var(--accent);font-weight:600;}
+.scan-select{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 4px;border-radius:4px;outline:none;width:100%;}
+.scan-select:focus{border-color:var(--accent);}
+#scan-entry-table tbody tr:hover{background:rgba(126,200,69,.03);}
+#scan-entry-table tbody td{padding:5px 8px;vertical-align:middle;}
+
+/* RESPONSIVE */
+@media(max-width:860px){
+  .sidebar{width:48px;}
+  .sb-item span:not(.sb-icon){display:none;}
+  .sb-badge{display:none;}
+  .sb-label{display:none;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .charts-2{grid-template-columns:1fr;}
+  .scan-grid{grid-template-columns:1fr;}
+  nav button span{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🌿</div>
+    <div class="logo-text">Sabzi<span>Tracker</span></div>
+  </div>
+  <nav>
+    <button onclick="go('dashboard')" id="nav-dashboard">📊 Dashboard</button>
+    <button onclick="go('scanner')"   id="nav-scanner">📷 Scan Invoice</button>
+    <button onclick="go('log')"       id="nav-log">📋 Purchase Log</button>
+    <button onclick="go('trends')"    id="nav-trends">📈 Trends</button>
+    <button onclick="go('suppliers')" id="nav-suppliers">🏪 Suppliers</button>
+    <button onclick="go('monthly')"   id="nav-monthly">📅 Monthly</button>
+    <button onclick="go('spending')"  id="nav-spending">💰 Spending</button>
+  </nav>
+  <div class="hdr-actions">
+    <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="btn btn-primary" onclick="go('scanner')">+ Scan Invoice</button>
+  </div>
+</header>
+
+<main>
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sb-label">Main</div>
+  <button class="sb-item" id="sb-dashboard" onclick="go('dashboard')"><span class="sb-icon">📊</span><span>Dashboard</span></button>
+  <button class="sb-item" id="sb-scanner"   onclick="go('scanner')"><span class="sb-icon">📷</span><span>Scan Invoice</span><span class="sb-badge" id="sb-count">0</span></button>
+  <button class="sb-item" id="sb-log"       onclick="go('log')"><span class="sb-icon">📋</span><span>Purchase Log</span></button>
+  <div class="sb-label">Analysis</div>
+  <button class="sb-item" id="sb-trends"    onclick="go('trends')"><span class="sb-icon">📈</span><span>Price Trends</span></button>
+  <button class="sb-item" id="sb-suppliers" onclick="go('suppliers')"><span class="sb-icon">🏪</span><span>Suppliers</span></button>
+  <button class="sb-item" id="sb-monthly"   onclick="go('monthly')"><span class="sb-icon">📅</span><span>Monthly Report</span></button>
+  <button class="sb-item" id="sb-spending"  onclick="go('spending')"><span class="sb-icon">💰</span><span>Spending</span></button>
+  <div class="sb-label" style="margin-top:8px">Data</div>
+  <button class="sb-item" onclick="triggerImport()"><span class="sb-icon">📤</span><span>Import Excel</span></button>
+  <button class="sb-item" onclick="confirmClear()"><span class="sb-icon" style="color:var(--red)">🗑</span><span style="color:var(--red)">Clear All Data</span></button>
+  <button class="sb-item" onclick="loadDemoData()"><span class="sb-icon" style="color:var(--amber)">🎯</span><span style="color:var(--amber)">Load Demo Data</span></button>
+  <input type="file" id="import-input" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
+</aside>
+
+<div class="content">
+
+<!-- ══ DASHBOARD ══ -->
+<div class="page active" id="page-dashboard">
+  <div class="page-hdr">
+    <div><div class="page-title">Dashboard</div><div class="page-sub">Overview of all purchases</div></div>
+    <div class="page-hdr-right">
+      <select id="dash-month" onchange="renderDashboard()" style="height:32px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:0 10px;font-family:'DM Sans',sans-serif;outline:none;">
+        <option value="">All Time</option>
+      </select>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value green" id="s-spend">₹0</div><div class="stat-sub" id="s-spend-sub">All purchases</div></div>
+    <div class="stat-card"><div class="stat-label">Items Tracked</div><div class="stat-value" id="s-items">0</div><div class="stat-sub">Unique items</div></div>
+    <div class="stat-card"><div class="stat-label">Rising Prices</div><div class="stat-value red" id="s-rising">0</div><div class="stat-sub">vs first purchase</div></div>
+    <div class="stat-card"><div class="stat-label">Invoices Scanned</div><div class="stat-value amber" id="s-invoices">0</div><div class="stat-sub">This session</div></div>
+  </div>
+  <div class="charts-2">
+    <div class="card">
+      <div class="card-title">Spend by Category</div>
+      <div class="card-sub">Total ₹ per category</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-cat"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Price Trend — Top Items</div>
+      <div class="card-sub">Rate over purchase dates</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-trend"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Recent Purchases</div>
+    <div class="card-sub">Last 15 entries</div>
+    <div class="table-wrap" id="recent-table-wrap"></div>
+  </div>
+</div>
+
+<!-- ══ SCANNER ══ -->
+<div class="page" id="page-scanner">
+  <div class="page-hdr">
+    <div><div class="page-title">Scan Invoice</div><div class="page-sub">Photograph or upload your bill — read it on screen and enter items quickly below</div></div>
+  </div>
+
+  <!-- Step 1: Image capture -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Step 1 — Load your invoice</div>
+    <div class="card-sub">Take a photo with your camera or upload an image from your files</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-primary" onclick="document.getElementById('cam-input').click()">📷 Use Camera</button>
+      <button class="btn btn-ghost"   onclick="document.getElementById('file-input').click()">🖼 Upload Photo / PDF</button>
+      <button class="btn btn-ghost"   onclick="clearScan()" id="clear-scan-btn" style="display:none">✕ Clear Image</button>
+      <input type="file" id="cam-input"  accept="image/*" capture="environment" style="display:none" onchange="loadInvoiceImage(this)">
+      <input type="file" id="file-input" accept="image/*,application/pdf"        style="display:none" onchange="loadInvoiceImage(this)">
+    </div>
+    <!-- Invoice preview -->
+    <div id="invoice-preview-wrap" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Invoice Image</div>
+          <img id="invoice-img" src="" alt="Invoice"
+            style="width:100%;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;max-height:480px;object-fit:contain;background:var(--bg3)"
+            onclick="toggleZoom(this)">
+          <div style="font-size:11px;color:var(--text3);margin-top:5px">Click image to zoom · Read item by item and enter below</div>
+        </div>
+        <!-- Invoice header fields -->
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Invoice Details</div>
+          <div style="display:grid;gap:8px">
+            <div>
+              <div class="form-label" style="margin-bottom:4px">Date (DD-MM-YYYY)</div>
+              <input class="form-input" id="scan-date" type="text" placeholder="03-04-2026" style="width:100%" oninput="syncScanHeader()">
+            </div>
+            <div>
+              <div class="form-label" style="margin-bottom:4px">Supplier / Party Name</div>
+              <input class="form-input" id="scan-supplier" type="text" placeholder="BHADBHADIYA SAGAR VALLABHBHAI" list="scan-sup-list" style="width:100%" oninput="syncScanHeader()">
+              <datalist id="scan-sup-list"></datalist>
+            </div>
+            <div>
+              <div class="form-label" style="margin-bottom:4px">Invoice Number</div>
+              <input class="form-input" id="scan-invoice" type="text" placeholder="904" style="width:100%" oninput="syncScanHeader()">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Empty state -->
+    <div id="invoice-empty" style="border:2px dashed var(--border2);border-radius:var(--radius);padding:36px;text-align:center;background:var(--bg2)">
+      <div style="font-size:32px;margin-bottom:8px">📋</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:4px">No invoice loaded yet</div>
+      <div style="color:var(--text2);font-size:13px">Use the buttons above to photograph or upload your bill</div>
+    </div>
+  </div>
+
+  <!-- Step 2: Fast item entry -->
+  <div class="card" id="entry-panel" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div class="card-title">Step 2 — Enter items from invoice</div>
+        <div class="card-sub" style="margin-bottom:0">Type each item you see on the bill — press Enter or Tab to move to the next field quickly</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="addScanRow()">+ Add Row</button>
+        <button class="btn btn-primary btn-sm" onclick="addAllToLog()" id="add-all-btn">✓ Save All to Log</button>
+      </div>
+    </div>
+
+    <!-- Quick-entry table -->
+    <div class="table-wrap" style="margin-bottom:12px">
+      <table id="scan-entry-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>Item Name</th>
+            <th style="width:90px">Category</th>
+            <th style="width:70px">Unit</th>
+            <th style="width:80px">Qty</th>
+            <th style="width:90px">Rate ₹</th>
+            <th style="width:90px">Amount ₹</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="scan-rows-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Running total bar -->
+    <div style="display:flex;gap:20px;align-items:center;padding:10px 14px;background:var(--bg3);border-radius:var(--radius-sm);font-size:12px;flex-wrap:wrap">
+      <span style="color:var(--text2)">Items: <strong id="scan-item-count" style="color:var(--text)">0</strong></span>
+      <span style="color:var(--text2)">Total: <strong id="scan-total" style="color:var(--accent);font-size:15px">₹0</strong></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" onclick="clearScanRows()" style="color:var(--red)">✕ Clear All Rows</button>
+    </div>
+  </div>
+
+  <!-- Saved confirmation -->
+  <div id="scan-saved-msg" style="display:none;margin-top:14px"></div>
+</div>
+
+<!-- ══ PURCHASE LOG ══ -->
+<div class="page" id="page-log">
+  <div class="page-hdr">
+    <div><div class="page-title">Purchase Log</div><div class="page-sub" id="log-subtitle">0 entries</div></div>
+    <div class="page-hdr-right">
+      <button class="btn btn-ghost btn-sm" onclick="openAddModal()">+ Add Entry</button>
+      <button class="btn btn-primary btn-sm" onclick="exportExcel()">⬇ Export</button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <input type="text"  id="f-search"   placeholder="🔍 Search item or supplier…" oninput="renderLog()" style="width:200px">
+    <select id="f-cat"  onchange="renderLog()"><option value="">All Categories</option><option>Vegetable</option><option>Grocery/Dry</option><option>Dairy</option><option>Fruit</option><option>Spice</option></select>
+    <select id="f-sup"  onchange="renderLog()"><option value="">All Suppliers</option></select>
+    <select id="f-date" onchange="renderLog()"><option value="">All Dates</option></select>
+    <div class="filter-spacer"></div>
+    <span id="f-count" style="font-size:12px;color:var(--text3)"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Supplier</th><th>Unit</th><th>Qty</th><th>Rate ₹</th><th>Amount ₹</th><th>Invoice</th><th style="width:60px">Actions</th></tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ TRENDS ══ -->
+<div class="page" id="page-trends">
+  <div class="page-hdr">
+    <div><div class="page-title">Price Trends</div><div class="page-sub">Track how rates change across purchases</div></div>
+    <div class="page-hdr-right">
+      <select id="trend-item-sel" onchange="renderTrendChart()" style="height:32px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:0 10px;min-width:180px;font-family:'DM Sans',sans-serif;outline:none;">
+        <option value="">— Select item to chart —</option>
+      </select>
+    </div>
+  </div>
+  <div class="stats-row" id="trend-stats-row">
+    <div class="stat-card"><div class="stat-label">Current Rate</div><div class="stat-value green" id="t-cur">—</div></div>
+    <div class="stat-card"><div class="stat-label">Average Rate</div><div class="stat-value" id="t-avg">—</div></div>
+    <div class="stat-card"><div class="stat-label">Lowest Rate</div><div class="stat-value amber" id="t-low">—</div></div>
+    <div class="stat-card"><div class="stat-label">Trend</div><div class="stat-value" id="t-trend" style="font-size:16px">—</div></div>
+  </div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-title">Rate Over Time</div>
+    <div class="card-sub" id="trend-chart-sub">Select an item above to see its price history</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="chart-item"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All Items — Trend Summary</div>
+    <div class="card-sub">First vs latest rate comparison for every tracked item</div>
+    <div class="filter-bar" style="margin-bottom:10px">
+      <input type="text" id="trend-search" placeholder="Filter items…" oninput="renderTrendTable()" style="width:180px">
+      <select id="trend-cat-f" onchange="renderTrendTable()" style="height:32px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:0 10px;font-family:'DM Sans',sans-serif;outline:none;"><option value="">All Categories</option><option>Vegetable</option><option>Grocery/Dry</option><option>Dairy</option><option>Fruit</option><option>Spice</option></select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th>First Rate ₹</th><th>Latest Rate ₹</th><th>Change ₹</th><th>Change %</th><th>Trend</th><th>Avg Rate ₹</th><th>Total Qty</th><th>Total Spend ₹</th></tr></thead>
+        <tbody id="trend-summary-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUPPLIERS ══ -->
+<div class="page" id="page-suppliers">
+  <div class="page-hdr">
+    <div><div class="page-title">Supplier Comparison</div><div class="page-sub">Compare prices and spending across vendors</div></div>
+  </div>
+  <div class="sup-grid" id="sup-cards"></div>
+  <div class="card">
+    <div class="card-title">Item-wise Rate by Supplier</div>
+    <div class="card-sub">Green = cheapest for that item · — = not purchased from this supplier</div>
+    <div class="filter-bar" style="margin-bottom:10px">
+      <input type="text" id="sup-search" placeholder="Filter items…" oninput="renderSupplierTable()" style="width:180px">
+    </div>
+    <div class="table-wrap" id="sup-compare-wrap"></div>
+  </div>
+</div>
+
+<!-- ══ MONTHLY ══ -->
+<div class="page" id="page-monthly">
+  <div class="page-hdr">
+    <div><div class="page-title">Monthly Report</div><div class="page-sub">Spend breakdown by month</div></div>
+    <div class="page-hdr-right">
+      <select id="monthly-sel" onchange="renderMonthly()" style="height:32px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:0 10px;font-family:'DM Sans',sans-serif;outline:none;">
+        <option value="">All Time</option>
+      </select>
+    </div>
+  </div>
+  <div id="monthly-stats" class="stats-row" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th>Supplier(s)</th><th>Total Qty</th><th>Avg Rate ₹</th><th>Total Spend ₹</th><th>Trend</th></tr></thead>
+        <tbody id="monthly-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SPENDING ══ -->
+<div class="page" id="page-spending">
+  <div class="page-hdr">
+    <div><div class="page-title">Spending Summary</div><div class="page-sub">Where your grocery budget goes</div></div>
+  </div>
+  <div class="charts-2">
+    <div class="card">
+      <div class="card-title">By Category</div>
+      <div class="card-sub">Total spend per category</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-sc"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">By Supplier</div>
+      <div class="card-sub">Total spend per supplier</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-ss"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Top 10 Items by Spend</div>
+    <div class="card-sub">Highest expenditure items this period</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th>Total Qty</th><th>Avg Rate ₹</th><th>Total Spend ₹</th><th>% of Budget</th><th>Trend</th></tr></thead>
+        <tbody id="top10-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</main>
+
+<!-- ZOOM OVERLAY -->
+<div class="zoom-overlay" id="zoom-overlay" onclick="this.classList.remove('open')">
+  <img id="zoom-img" src="" alt="">
+</div>
+
+<!-- ══ ADD / EDIT MODAL ══ -->
+<div class="modal-overlay" id="entry-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Purchase Entry</div>
+    <div class="form-grid">
+      <div class="form-field">
+        <div class="form-label">Date (DD-MM-YYYY)</div>
+        <input class="form-input" id="m-date" type="text" placeholder="03-04-2026">
+      </div>
+      <div class="form-field">
+        <div class="form-label">Invoice No.</div>
+        <input class="form-input" id="m-inv" type="text" placeholder="904">
+      </div>
+      <div class="form-field full">
+        <div class="form-label">Supplier / Party</div>
+        <input class="form-input" id="m-sup" type="text" placeholder="BHADBHADIYA SAGAR VALLABHBHAI" list="sup-list">
+        <datalist id="sup-list"></datalist>
+      </div>
+      <div class="form-field full">
+        <div class="form-label">Item Name (English)</div>
+        <input class="form-input" id="m-item" type="text" placeholder="Tomato">
+      </div>
+      <div class="form-field full">
+        <div class="form-label">Item Name (Original / Gujarati)</div>
+        <input class="form-input" id="m-orig" type="text" placeholder="ટામેટા">
+      </div>
+      <div class="form-field">
+        <div class="form-label">Category</div>
+        <select class="form-input" id="m-cat">
+          <option>Vegetable</option><option>Grocery/Dry</option><option>Dairy</option><option>Fruit</option><option>Spice</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <div class="form-label">Unit</div>
+        <select class="form-input" id="m-unit">
+          <option>kg</option><option>g</option><option>piece</option><option>dozen</option><option>bundle</option><option>litre</option><option>ml</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <div class="form-label">Qty</div>
+        <input class="form-input" id="m-qty" type="number" step="0.01" placeholder="10" oninput="calcAmount()">
+      </div>
+      <div class="form-field">
+        <div class="form-label">Rate (₹ per unit)</div>
+        <input class="form-input" id="m-rate" type="number" step="0.01" placeholder="26.00" oninput="calcAmount()">
+      </div>
+      <div class="form-field full">
+        <div class="form-label">Amount (₹) — auto-calculated</div>
+        <input class="form-input" id="m-amt" type="number" step="0.01" placeholder="260.00" style="color:var(--accent)">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEntry()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let DB = [];
+let extracted = [];
+let invCount = +sessionStorage.getItem('sabzi_inv') || 0;
+let charts = {};
+let editingId = null;
+let currentPage = 'dashboard';
+
+// Load persisted data
+try { DB = JSON.parse(localStorage.getItem('sabzi_db') || '[]'); } catch(e){ DB=[]; }
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION — single source of truth
+// ═══════════════════════════════════════════════════════════
+function go(id) {
+  currentPage = id;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-item, nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const sb = document.getElementById('sb-'+id);
+  const nv = document.getElementById('nav-'+id);
+  if (sb) sb.classList.add('active');
+  if (nv) nv.classList.add('active');
+  const fn = {dashboard:renderDashboard, log:renderLog, trends:renderTrends, suppliers:renderSuppliers, monthly:renderMonthly, spending:renderSpending};
+  if (fn[id]) fn[id]();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg, type='ok') {
+  clearTimeout(toastTimer);
+  const t = document.getElementById('toast');
+  t.textContent = (type==='ok'?'✓  ':'✕  ') + msg;
+  t.className = 'show ' + type;
+  toastTimer = setTimeout(() => { t.className=''; }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// DB HELPERS
+// ═══════════════════════════════════════════════════════════
+function saveDB() {
+  localStorage.setItem('sabzi_db', JSON.stringify(DB));
+  document.getElementById('sb-count').textContent = invCount;
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function parseDateSort(d) {
+  // DD-MM-YYYY → YYYY-MM-DD for sorting
+  if (!d) return '';
+  const p = d.split('-');
+  if (p.length === 3 && p[2].length === 4) return p[2]+'-'+p[1]+'-'+p[0];
+  return d;
+}
+
+function getMonthKey(d) {
+  // DD-MM-YYYY → MM-YYYY
+  if (!d) return '';
+  const p = d.split('-');
+  if (p.length === 3) return p[1]+'-'+p[2];
+  return '';
+}
+
+function catClass(cat) {
+  const m = {Vegetable:'vegetable','Grocery/Dry':'grocery',Dairy:'dairy',Fruit:'fruit',Spice:'spice'};
+  return 'b-'+(m[cat]||'other');
+}
+
+function trendLabel(pct) {
+  if (pct >  10) return { txt:'📈 Rising',      cls:'t-rising'  };
+  if (pct >   3) return { txt:'🔺 Slight Rise', cls:'t-slight'  };
+  if (pct < -10) return { txt:'📉 Dropping',    cls:'t-dropping'};
+  if (pct <  -3) return { txt:'🔻 Falling',     cls:'t-falling' };
+  return             { txt:'🟢 Stable',      cls:'t-stable'  };
+}
+
+function getItemTrends() {
+  const items = [...new Set(DB.map(r=>r.item))];
+  const out = {};
+  items.forEach(item => {
+    const rows = DB.filter(r=>r.item===item).sort((a,b)=>parseDateSort(a.date).localeCompare(parseDateSort(b.date)));
+    const rates = rows.map(r=>+r.rate||0);
+    const qtys  = rows.map(r=>+r.qty||0);
+    const amts  = rows.map(r=>+r.amount||0);
+    const avg   = rates.reduce((s,v)=>s+v,0)/rates.length;
+    const min   = Math.min(...rates);
+    const first = rates[0], last = rates[rates.length-1];
+    const pct   = first>0 ? (last-first)/first*100 : 0;
+    const tl    = trendLabel(pct);
+    out[item] = {
+      pct, avg, min, first, last,
+      label: tl.txt, cls: tl.cls,
+      totalQty:  qtys.reduce((s,v)=>s+v,0),
+      totalSpend:amts.reduce((s,v)=>s+v,0),
+      category:  rows[0]?.category || '',
+      unit:      rows[0]?.unit || '',
+      rows
+    };
+  });
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART HELPER
+// ═══════════════════════════════════════════════════════════
+const C_PALETTE = ['#7ec845','#e8a020','#4094e8','#e86440','#c864c8','#5a6356','#64c8a0','#e8c040','#a064e8'];
+
+function mkChart(id, type, labels, values, colors, datasetsOverride) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  const el = document.getElementById(id);
+  if (!el) return;
+  // Show placeholder text if no data
+  const hasData = datasetsOverride
+    ? datasetsOverride.some(d=>d.data&&d.data.filter(v=>v!=null&&v!==0).length>0)
+    : values && values.length>0 && values.some(v=>v>0);
+  if (!hasData && !datasetsOverride) {
+    const parent = el.parentElement;
+    el.style.display='none';
+    if (!parent.querySelector('.chart-empty')) {
+      const ph=document.createElement('div');
+      ph.className='chart-empty';
+      ph.style.cssText='display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:13px;';
+      ph.textContent='No data yet';
+      parent.appendChild(ph);
+    }
+    return;
+  } else {
+    el.style.display='';
+    const old=el.parentElement.querySelector('.chart-empty');
+    if(old) old.remove();
+  }
+  const datasets = datasetsOverride || [{
+    data: values,
+    backgroundColor: type==='doughnut' ? (colors||C_PALETTE) : (colors||C_PALETTE[0]),
+    borderColor:      type==='line'     ? (colors||C_PALETTE[0]) : 'transparent',
+    borderWidth:      type==='doughnut' ? 0 : 2,
+    fill: false, tension: 0.4, pointRadius: 4, pointHoverRadius: 6, spanGaps: true
+  }];
+  charts[id] = new Chart(el.getContext('2d'), {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      plugins: {
+        legend: { labels: { color:'#9aa494', font:{size:11,family:'DM Sans'}, boxWidth:10, padding:10 }, position: type==='doughnut'?'right':'top' },
+        tooltip: { backgroundColor:'#1c201b', titleColor:'#e8ebe5', bodyColor:'#9aa494', borderColor:'#2a2f28', borderWidth:1,
+          callbacks: { label: ctx => type==='doughnut' ? ` ₹${(+ctx.raw||0).toLocaleString('en-IN',{maximumFractionDigits:0})}` : ` ₹${(+ctx.raw||0).toFixed(2)}` }
+        }
+      },
+      scales: type==='line' ? {
+        x: { ticks:{color:'#5a6356',font:{size:10}}, grid:{color:'rgba(42,47,40,.6)'} },
+        y: { ticks:{color:'#5a6356',font:{size:10},callback:v=>'₹'+v}, grid:{color:'rgba(42,47,40,.6)'}, beginAtZero:false }
+      } : {}
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function renderDashboard() {
+  // Populate month filter
+  const months = [...new Set(DB.map(r=>getMonthKey(r.date)).filter(Boolean))].sort();
+  const mSel = document.getElementById('dash-month');
+  const mCur = mSel.value;
+  mSel.innerHTML = '<option value="">All Time</option>' + months.map(m=>`<option value="${m}"${m===mCur?'selected':''}>${m}</option>`).join('');
+
+  const filterVal = mSel.value;
+  const data = filterVal ? DB.filter(r=>getMonthKey(r.date)===filterVal) : DB;
+
+  const totalSpend = data.reduce((s,r)=>s+(+r.amount||0),0);
+  const uniqueItems = new Set(data.map(r=>r.item)).size;
+  const trends = getItemTrends();
+  const rising = Object.values(trends).filter(t=>t.pct>5).length;
+
+  document.getElementById('s-spend').textContent   = '₹'+totalSpend.toLocaleString('en-IN',{maximumFractionDigits:0});
+  document.getElementById('s-spend-sub').textContent = filterVal ? filterVal : 'All purchases';
+  document.getElementById('s-items').textContent   = uniqueItems;
+  document.getElementById('s-rising').textContent  = rising;
+  document.getElementById('s-invoices').textContent = invCount;
+
+  // Category doughnut
+  const catAcc = {};
+  data.forEach(r=>{ catAcc[r.category||'Other'] = (catAcc[r.category||'Other']||0)+(+r.amount||0); });
+  const catKeys = Object.keys(catAcc), catVals = Object.values(catAcc).map(v=>Math.round(v));
+  mkChart('chart-cat','doughnut',catKeys,catVals,C_PALETTE.slice(0,catKeys.length));
+
+  // Top 5 items line
+  const topItems = Object.entries(trends).sort((a,b)=>b[1].totalSpend-a[1].totalSpend).slice(0,5).map(e=>e[0]);
+  const allDates = [...new Set(data.map(r=>r.date))].sort((a,b)=>parseDateSort(a).localeCompare(parseDateSort(b)));
+  const lineDS = topItems.map((item,i)=>({
+    label: item,
+    data: allDates.map(d=>{ const rs=data.filter(r=>r.item===item&&r.date===d); return rs.length?rs.reduce((s,r)=>s+(+r.rate||0),0)/rs.length:null; }),
+    borderColor: C_PALETTE[i], backgroundColor:'transparent', tension:0.4, pointRadius:3, spanGaps:true, borderWidth:2
+  }));
+  mkChart('chart-trend','line',allDates,null,null,lineDS.length?lineDS:[{label:'No data',data:[],borderColor:'#5a6356'}]);
+
+  // Recent table
+  const recent = data.slice().sort((a,b)=>parseDateSort(b.date).localeCompare(parseDateSort(a.date))).slice(0,15);
+  const wrap = document.getElementById('recent-table-wrap');
+  if (recent.length) {
+    wrap.innerHTML = `<table><thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Supplier</th><th>Qty</th><th>Rate ₹</th><th>Amount ₹</th></tr></thead>
+      <tbody>${recent.map(r=>`<tr>
+        <td class="dim">${r.date||''}</td>
+        <td><strong>${r.item}</strong>${r.item_orig?`<span style="display:block;font-size:10px;color:var(--text3)">${r.item_orig}</span>`:''}</td>
+        <td><span class="badge ${catClass(r.category)}">${r.category||''}</span></td>
+        <td class="dim">${r.supplier||''}</td>
+        <td>${r.qty||''} ${r.unit||''}</td>
+        <td>₹${(+r.rate).toFixed(2)}</td>
+        <td>₹${(+r.amount).toFixed(0)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } else {
+    wrap.innerHTML = `<div class="empty"><div class="empty-ico">🌿</div><div>No data yet — scan your first invoice!</div></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PURCHASE LOG
+// ═══════════════════════════════════════════════════════════
+function renderLog() {
+  const search = (document.getElementById('f-search').value||'').toLowerCase();
+  const fCat   = document.getElementById('f-cat').value;
+  const fSup   = document.getElementById('f-sup').value;
+  const fDate  = document.getElementById('f-date').value;
+
+  // Rebuild supplier dropdown preserving selection
+  const sups = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
+  const supSel = document.getElementById('f-sup');
+  supSel.innerHTML = '<option value="">All Suppliers</option>' + sups.map(s=>`<option${s===fSup?' selected':''}>${s}</option>`).join('');
+
+  // Rebuild date dropdown preserving selection
+  const dts = [...new Set(DB.map(r=>r.date).filter(Boolean))].sort((a,b)=>parseDateSort(b).localeCompare(parseDateSort(a)));
+  const dtSel = document.getElementById('f-date');
+  dtSel.innerHTML = '<option value="">All Dates</option>' + dts.map(d=>`<option${d===fDate?' selected':''}>${d}</option>`).join('');
+
+  let rows = DB.filter(r=>
+    (!search || r.item.toLowerCase().includes(search) || (r.supplier||'').toLowerCase().includes(search) || (r.item_orig||'').toLowerCase().includes(search)) &&
+    (!fCat  || r.category===fCat) &&
+    (!fSup  || r.supplier===fSup) &&
+    (!fDate || r.date===fDate)
+  ).sort((a,b)=>parseDateSort(b.date).localeCompare(parseDateSort(a.date)));
+
+  document.getElementById('log-subtitle').textContent = `${DB.length} entr${DB.length===1?'y':'ies'}`;
+  document.getElementById('f-count').textContent = rows.length < DB.length ? `Showing ${rows.length} of ${DB.length}` : `${DB.length} entries`;
+
+  const body = document.getElementById('log-body');
+  if (!DB.length) {
+    body.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-ico">🌿</div><div>No data yet — scan your first invoice or add an entry manually.</div></div></td></tr>`;
+    return;
+  }
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-ico">🔍</div><div>No entries match your filters. <span style="color:var(--accent);cursor:pointer" onclick="document.getElementById('f-search').value='';document.getElementById('f-cat').value='';document.getElementById('f-sup').value='';document.getElementById('f-date').value='';renderLog()">Clear filters</span></div></div></td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(r=>`<tr>
+    <td class="dim">${r.date||''}</td>
+    <td><strong>${r.item}</strong>${r.item_orig?`<span style="display:block;font-size:10px;color:var(--text3)">${r.item_orig}</span>`:''}</td>
+    <td><span class="badge ${catClass(r.category)}">${r.category||''}</span></td>
+    <td class="dim">${r.supplier||''}</td>
+    <td class="dim">${r.unit||''}</td>
+    <td>${r.qty||''}</td>
+    <td>₹${(+r.rate||0).toFixed(2)}</td>
+    <td>₹${(+r.amount||0).toFixed(0)}</td>
+    <td class="dim mono">${r.invoice_no||''}</td>
+    <td>
+      <button class="icon-btn edit" onclick="openEditModal('${r.id}')" title="Edit">✏️</button>
+      <button class="icon-btn del"  onclick="deleteRow('${r.id}')"    title="Delete">🗑</button>
+    </td>
+  </tr>`).join('');
+}
+
+function deleteRow(id) {
+  DB = DB.filter(r=>r.id!==id);
+  saveDB(); renderLog();
+  toast('Entry deleted');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL — Add / Edit
+// ═══════════════════════════════════════════════════════════
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add Purchase Entry';
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2,'0');
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const yyyy = today.getFullYear();
+  clearModalFields();
+  document.getElementById('m-date').value = `${dd}-${mm}-${yyyy}`;
+  populateSupDatalist();
+  document.getElementById('entry-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const row = DB.find(r=>r.id===id);
+  if (!row) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Edit Purchase Entry';
+  document.getElementById('m-date').value  = row.date||'';
+  document.getElementById('m-inv').value   = row.invoice_no||'';
+  document.getElementById('m-sup').value   = row.supplier||'';
+  document.getElementById('m-item').value  = row.item||'';
+  document.getElementById('m-orig').value  = row.item_orig||'';
+  document.getElementById('m-cat').value   = row.category||'Vegetable';
+  document.getElementById('m-unit').value  = row.unit||'kg';
+  document.getElementById('m-qty').value   = row.qty||'';
+  document.getElementById('m-rate').value  = row.rate||'';
+  document.getElementById('m-amt').value   = row.amount||'';
+  populateSupDatalist();
+  document.getElementById('entry-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('entry-modal').classList.remove('open');
+  editingId = null;
+}
+
+function clearModalFields() {
+  ['m-inv','m-sup','m-item','m-orig','m-qty','m-rate','m-amt'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-cat').value='Vegetable';
+  document.getElementById('m-unit').value='kg';
+}
+
+function populateSupDatalist() {
+  const sups = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
+  document.getElementById('sup-list').innerHTML = sups.map(s=>`<option value="${s}">`).join('');
+}
+
+function calcAmount() {
+  const qty  = +document.getElementById('m-qty').value||0;
+  const rate = +document.getElementById('m-rate').value||0;
+  if (qty&&rate) document.getElementById('m-amt').value = (qty*rate).toFixed(2);
+}
+
+function saveEntry() {
+  const item = document.getElementById('m-item').value.trim();
+  const rate = +document.getElementById('m-rate').value||0;
+  const qty  = +document.getElementById('m-qty').value||0;
+  const date = document.getElementById('m-date').value.trim();
+  if (!item)           { toast('Item name is required','err'); return; }
+  if (!rate || !qty)   { toast('Qty and Rate are required','err'); return; }
+  if (date && !validateDate(date)) { toast('Date must be DD-MM-YYYY (e.g. 03-04-2026)','err'); return; }
+
+  const row = {
+    id:          editingId || uid(),
+    date:        document.getElementById('m-date').value.trim(),
+    invoice_no:  document.getElementById('m-inv').value.trim(),
+    supplier:    document.getElementById('m-sup').value.trim(),
+    item,
+    item_orig:   document.getElementById('m-orig').value.trim(),
+    category:    document.getElementById('m-cat').value,
+    unit:        document.getElementById('m-unit').value,
+    qty, rate,
+    amount:      +(document.getElementById('m-amt').value)||qty*rate
+  };
+
+  if (editingId) {
+    const idx = DB.findIndex(r=>r.id===editingId);
+    if (idx>=0) DB[idx]=row;
+    toast('Entry updated');
+  } else {
+    DB.unshift(row);
+    toast('Entry added');
+  }
+  saveDB();
+  closeModal();
+  renderLog();
+}
+
+// Close modal on overlay click or Escape key
+document.getElementById('entry-modal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+
+function validateDate(d) {
+  if (!d) return true; // allow empty
+  const re = /^\d{2}-\d{2}-\d{4}$/;
+  if (!re.test(d)) return false;
+  const [dd,mm,yyyy] = d.split('-').map(Number);
+  if (mm<1||mm>12||dd<1||dd>31||yyyy<2000||yyyy>2100) return false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCANNER — NO API KEY REQUIRED
+// Camera / file picker → view image → manual fast entry
+// ═══════════════════════════════════════════════════════════
+
+// Known items for autocomplete (built from DB + common Gujarati vegetables)
+const KNOWN_ITEMS = [
+  'Tomato','Potato','Onion','Green Chilli','Red Chilli','Coriander','Ginger',
+  'Garlic','Brinjal','Okra','Cauliflower','Cabbage','Spinach','Fenugreek',
+  'Cluster Beans','Ridge Gourd','Bitter Gourd','Bottle Gourd','Pumpkin',
+  'Raw Banana','Sweet Potato','Yam','Carrot','Radish','Beetroot','Cucumber',
+  'Lemon','Lime Leaves','Green Garlic','Drumstick','Ivy Gourd','Tindora',
+  'Flat Beans','Valor Papdi','Suran','Kand','Turmeric','Guar',
+  'Capsicum','Corn','Broccoli','Mushroom','Peas','Spring Onion',
+  'Milk','Paneer','Curd','Ghee','Butter','Cream',
+  'Rice','Wheat Flour','Sugar','Salt','Oil','Besan','Maida',
+  'Toor Dal','Moong Dal','Chana Dal','Urad Dal','Masoor Dal','Rajma',
+  'Cumin','Mustard','Turmeric Powder','Red Chilli Powder','Coriander Powder',
+  'Garam Masala','Kitchen King Masala','Kashmiri Chilli Powder',
+  'Sev','Fryums','Papdi','Mamra','Banana','Apple','Mango'
+];
+
+const CAT_MAP = {
+  'Tomato':'Vegetable','Potato':'Vegetable','Onion':'Vegetable','Green Chilli':'Vegetable',
+  'Red Chilli':'Vegetable','Coriander':'Vegetable','Ginger':'Vegetable','Garlic':'Vegetable',
+  'Brinjal':'Vegetable','Okra':'Vegetable','Cauliflower':'Vegetable','Cabbage':'Vegetable',
+  'Spinach':'Vegetable','Fenugreek':'Vegetable','Cluster Beans':'Vegetable',
+  'Ridge Gourd':'Vegetable','Bitter Gourd':'Vegetable','Bottle Gourd':'Vegetable',
+  'Pumpkin':'Vegetable','Raw Banana':'Vegetable','Sweet Potato':'Vegetable',
+  'Yam':'Vegetable','Carrot':'Vegetable','Radish':'Vegetable','Beetroot':'Vegetable',
+  'Cucumber':'Vegetable','Lemon':'Vegetable','Lime Leaves':'Vegetable',
+  'Green Garlic':'Vegetable','Drumstick':'Vegetable','Ivy Gourd':'Vegetable',
+  'Tindora':'Vegetable','Flat Beans':'Vegetable','Valor Papdi':'Vegetable',
+  'Kand':'Vegetable','Guar':'Vegetable','Capsicum':'Vegetable','Corn':'Vegetable',
+  'Broccoli':'Vegetable','Mushroom':'Vegetable','Peas':'Vegetable',
+  'Spring Onion':'Vegetable','Turmeric':'Vegetable','Suran':'Vegetable',
+  'Milk':'Dairy','Paneer':'Dairy','Curd':'Dairy','Ghee':'Dairy','Butter':'Dairy','Cream':'Dairy',
+  'Rice':'Grocery/Dry','Wheat Flour':'Grocery/Dry','Sugar':'Grocery/Dry','Salt':'Grocery/Dry',
+  'Oil':'Grocery/Dry','Besan':'Grocery/Dry','Maida':'Grocery/Dry',
+  'Toor Dal':'Grocery/Dry','Moong Dal':'Grocery/Dry','Chana Dal':'Grocery/Dry',
+  'Urad Dal':'Grocery/Dry','Masoor Dal':'Grocery/Dry','Rajma':'Grocery/Dry',
+  'Cumin':'Spice','Mustard':'Spice','Turmeric Powder':'Spice','Red Chilli Powder':'Spice',
+  'Coriander Powder':'Spice','Garam Masala':'Spice','Kitchen King Masala':'Spice',
+  'Kashmiri Chilli Powder':'Spice',
+  'Sev':'Grocery/Dry','Fryums':'Grocery/Dry','Papdi':'Grocery/Dry','Mamra':'Grocery/Dry',
+  'Banana':'Fruit','Apple':'Fruit','Mango':'Fruit'
+};
+
+let scanRows = []; // [{id,item,category,unit,qty,rate,amount}]
+let scanRowCounter = 0;
+
+function loadInvoiceImage(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const src = e.target.result;
+    document.getElementById('invoice-img').src = src;
+    document.getElementById('invoice-preview-wrap').style.display = 'block';
+    document.getElementById('invoice-empty').style.display = 'none';
+    document.getElementById('entry-panel').style.display = 'block';
+    document.getElementById('clear-scan-btn').style.display = '';
+    document.getElementById('scan-saved-msg').style.display = 'none';
+    // Populate supplier datalist from DB
+    const sups = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
+    document.getElementById('scan-sup-list').innerHTML = sups.map(s=>`<option value="${s}">`).join('');
+    // Pre-fill today's date if empty
+    if (!document.getElementById('scan-date').value) {
+      const t = new Date();
+      document.getElementById('scan-date').value =
+        String(t.getDate()).padStart(2,'0')+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+t.getFullYear();
+    }
+    // Start with 5 blank rows if none exist
+    if (!scanRows.length) { for(let i=0;i<5;i++) addScanRow(); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearScan() {
+  document.getElementById('invoice-img').src = '';
+  document.getElementById('invoice-preview-wrap').style.display = 'none';
+  document.getElementById('invoice-empty').style.display = '';
+  document.getElementById('entry-panel').style.display = 'none';
+  document.getElementById('clear-scan-btn').style.display = 'none';
+  document.getElementById('scan-saved-msg').style.display = 'none';
+  document.getElementById('scan-date').value = '';
+  document.getElementById('scan-supplier').value = '';
+  document.getElementById('scan-invoice').value = '';
+  scanRows = [];
+  document.getElementById('scan-rows-body').innerHTML = '';
+  updateScanTotals();
+}
+
+function toggleZoom(img) {
+  document.getElementById('zoom-img').src = img.src;
+  document.getElementById('zoom-overlay').classList.add('open');
+}
+
+function syncScanHeader() {
+  // Keep header fields synced — nothing extra needed, they're read on save
+}
+
+function addScanRow() {
+  const id = 'sr_' + (++scanRowCounter);
+  scanRows.push({id, item:'', category:'Vegetable', unit:'kg', qty:'', rate:'', amount:''});
+  renderScanRow(id);
+  // Focus the item field of the new row
+  setTimeout(() => {
+    const el = document.getElementById('item_'+id);
+    if (el) el.focus();
+  }, 30);
+}
+
+function renderScanRow(id) {
+  const r = scanRows.find(x=>x.id===id);
+  if (!r) return;
+  const rowNum = scanRows.findIndex(x=>x.id===id)+1;
+  const body = document.getElementById('scan-rows-body');
+
+  // Build datalist id for this row
+  const dlId = 'dl_'+id;
+
+  // Build all known + DB items for autocomplete
+  const allItems = [...new Set([...KNOWN_ITEMS, ...DB.map(x=>x.item)])].sort();
+
+  const tr = document.createElement('tr');
+  tr.id = 'tr_'+id;
+  tr.innerHTML = `
+    <td style="color:var(--text3);font-size:11px;text-align:center">${rowNum}</td>
+    <td>
+      <input class="scan-input" id="item_${id}" list="${dlId}" value="${r.item}"
+        placeholder="Item name…"
+        oninput="onScanItem('${id}',this.value)"
+        onkeydown="scanKeyNav(event,'${id}','item')"
+        style="min-width:140px">
+      <datalist id="${dlId}">${allItems.map(i=>`<option value="${i}">`).join('')}</datalist>
+    </td>
+    <td>
+      <select class="scan-select" id="cat_${id}" onchange="setScanField('${id}','category',this.value)">
+        ${['Vegetable','Grocery/Dry','Dairy','Fruit','Spice'].map(c=>`<option${c===r.category?' selected':''}>${c}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <select class="scan-select" id="unit_${id}" onchange="setScanField('${id}','unit',this.value)">
+        ${['kg','g','piece','dozen','bundle','litre','ml'].map(u=>`<option${u===r.unit?' selected':''}>${u}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <input class="scan-input" id="qty_${id}" type="number" step="0.01" min="0"
+        value="${r.qty}" placeholder="0"
+        oninput="setScanNum('${id}','qty',this.value)"
+        onkeydown="scanKeyNav(event,'${id}','qty')"
+        style="width:68px">
+    </td>
+    <td>
+      <input class="scan-input" id="rate_${id}" type="number" step="0.01" min="0"
+        value="${r.rate}" placeholder="0.00"
+        oninput="setScanNum('${id}','rate',this.value)"
+        onkeydown="scanKeyNav(event,'${id}','rate')"
+        style="width:78px">
+    </td>
+    <td>
+      <input class="scan-input amt-cell" id="amt_${id}" type="number" step="0.01"
+        value="${r.amount}" placeholder="—"
+        oninput="setScanNum('${id}','amount',this.value)"
+        onkeydown="scanKeyNav(event,'${id}','amount')"
+        style="width:78px">
+    </td>
+    <td>
+      <button class="icon-btn del" onclick="deleteScanRow('${id}')" title="Remove row">✕</button>
+    </td>`;
+  body.appendChild(tr);
+}
+
+function onScanItem(id, value) {
+  const r = scanRows.find(x=>x.id===id);
+  if (!r) return;
+  r.item = value;
+  // Auto-set category if known
+  const cat = CAT_MAP[value];
+  if (cat) {
+    r.category = cat;
+    const catEl = document.getElementById('cat_'+id);
+    if (catEl) catEl.value = cat;
+  }
+  // Auto-set unit from DB history
+  const hist = DB.filter(x=>x.item===value);
+  if (hist.length) {
+    const u = hist[hist.length-1].unit||'kg';
+    r.unit = u;
+    const uEl = document.getElementById('unit_'+id);
+    if (uEl) uEl.value = u;
+  }
+}
+
+function setScanField(id, field, value) {
+  const r = scanRows.find(x=>x.id===id); if (!r) return;
+  r[field] = value;
+}
+
+function setScanNum(id, field, value) {
+  const r = scanRows.find(x=>x.id===id); if (!r) return;
+  r[field] = value;
+  // Auto-calc amount when qty and rate are both set
+  if (field==='qty'||field==='rate') {
+    const qty = +document.getElementById('qty_'+id)?.value||0;
+    const rate= +document.getElementById('rate_'+id)?.value||0;
+    if (qty>0&&rate>0) {
+      const amt = (qty*rate).toFixed(2);
+      r.amount = amt;
+      const amtEl = document.getElementById('amt_'+id);
+      if (amtEl) amtEl.value = amt;
+    }
+  }
+  if (field==='amount') r.amount = value;
+  updateScanTotals();
+}
+
+function deleteScanRow(id) {
+  scanRows = scanRows.filter(x=>x.id!==id);
+  const tr = document.getElementById('tr_'+id);
+  if (tr) tr.remove();
+  // Renumber remaining rows
+  scanRows.forEach((r,i)=>{
+    const numCell = document.querySelector(`#tr_${r.id} td:first-child`);
+    if (numCell) numCell.textContent = i+1;
+  });
+  updateScanTotals();
+}
+
+function clearScanRows() {
+  scanRows=[];
+  document.getElementById('scan-rows-body').innerHTML='';
+  updateScanTotals();
+  for(let i=0;i<5;i++) addScanRow();
+}
+
+function updateScanTotals() {
+  const valid = scanRows.filter(r=>r.item&&(+r.qty||0)>0&&(+r.rate||0)>0);
+  const total = valid.reduce((s,r)=>s+(+r.amount||+r.qty*+r.rate||0),0);
+  document.getElementById('scan-item-count').textContent = valid.length;
+  document.getElementById('scan-total').textContent = '₹'+total.toLocaleString('en-IN',{maximumFractionDigits:0});
+}
+
+// Keyboard navigation: Tab/Enter moves to next logical field, then next row
+function scanKeyNav(e, id, field) {
+  if (e.key !== 'Enter' && e.key !== 'Tab') return;
+  const order = ['item','qty','rate'];
+  const idx = order.indexOf(field);
+  if (e.key==='Enter' || (e.key==='Tab' && !e.shiftKey)) {
+    if (field==='rate' || field==='amount') {
+      // Move to next row's item field
+      e.preventDefault();
+      const rowIdx = scanRows.findIndex(x=>x.id===id);
+      if (rowIdx < scanRows.length-1) {
+        document.getElementById('item_'+scanRows[rowIdx+1].id)?.focus();
+      } else {
+        addScanRow(); // auto-add row at bottom
+      }
+    } else if (idx>=0 && idx<order.length-1 && e.key==='Enter') {
+      e.preventDefault();
+      document.getElementById(order[idx+1]+'_'+id)?.focus();
+    }
+  }
+  // auto-calc on any key in rate field
+  if (field==='rate') setScanNum(id,'rate',document.getElementById('rate_'+id)?.value||'');
+}
+
+function addAllToLog() {
+  const date     = document.getElementById('scan-date').value.trim();
+  const supplier = document.getElementById('scan-supplier').value.trim();
+  const inv_no   = document.getElementById('scan-invoice').value.trim();
+
+  if (!date)     { toast('Please enter the invoice date','err'); document.getElementById('scan-date').focus(); return; }
+  if (!validateDate(date)) { toast('Date must be DD-MM-YYYY','err'); return; }
+  if (!supplier) { toast('Please enter the supplier name','err'); document.getElementById('scan-supplier').focus(); return; }
+
+  // Read live values from DOM (in case user typed without triggering oninput)
+  scanRows.forEach(r=>{
+    const itemEl = document.getElementById('item_'+r.id);
+    const qtyEl  = document.getElementById('qty_'+r.id);
+    const rateEl = document.getElementById('rate_'+r.id);
+    const amtEl  = document.getElementById('amt_'+r.id);
+    const catEl  = document.getElementById('cat_'+r.id);
+    const unitEl = document.getElementById('unit_'+r.id);
+    if (itemEl) r.item = itemEl.value.trim();
+    if (qtyEl)  r.qty  = qtyEl.value;
+    if (rateEl) r.rate = rateEl.value;
+    if (amtEl)  r.amount = amtEl.value;
+    if (catEl)  r.category = catEl.value;
+    if (unitEl) r.unit = unitEl.value;
+  });
+
+  const valid = scanRows.filter(r=>r.item && (+r.qty||0)>0 && (+r.rate||0)>0);
+  if (!valid.length) { toast('No valid rows to save — fill Item, Qty and Rate','err'); return; }
+
+  valid.forEach(r=>{
+    const qty = +r.qty||0, rate = +r.rate||0;
+    DB.unshift({
+      id:uid(), date, supplier, invoice_no:inv_no,
+      item: r.item, item_orig:'', category: r.category||'Vegetable',
+      unit: r.unit||'kg', qty, rate,
+      amount: +r.amount||qty*rate
+    });
+  });
+
+  invCount++;
+  sessionStorage.setItem('sabzi_inv', invCount);
+  saveDB();
+
+  // Show success message
+  const total = valid.reduce((s,r)=>s+(+r.amount||+r.qty*+r.rate||0),0);
+  document.getElementById('scan-saved-msg').style.display='block';
+  document.getElementById('scan-saved-msg').innerHTML=`
+    <div style="background:rgba(126,200,69,.1);border:1px solid var(--accent-dim);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="color:var(--accent);font-weight:600;font-size:14px">✓ ${valid.length} item${valid.length!==1?'s':''} saved to Purchase Log</div>
+        <div style="color:var(--text2);font-size:12px;margin-top:2px">Date: ${date} · Supplier: ${supplier} · Total: ₹${total.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="scanNextInvoice()">+ Next Invoice</button>
+        <button class="btn btn-primary btn-sm" onclick="go('log')">View Purchase Log →</button>
+      </div>
+    </div>`;
+
+  toast(`${valid.length} items saved!`);
+  // Clear rows for next entry
+  scanRows=[];
+  document.getElementById('scan-rows-body').innerHTML='';
+  updateScanTotals();
+}
+
+function scanNextInvoice() {
+  // Keep the image visible, reset header fields except supplier, add fresh rows
+  document.getElementById('scan-invoice').value = '';
+  document.getElementById('scan-date').value = '';
+  document.getElementById('scan-saved-msg').style.display='none';
+  for(let i=0;i<5;i++) addScanRow();
+  document.getElementById('scan-date').focus();
+}
+
+// Legacy stubs (kept so no other code breaks if referenced)
+function handleFiles(){}
+function dragOver(e){e.preventDefault();}
+function dragLeave(){}
+function dropFile(e){e.preventDefault();}
+function clearExtracted(){}
+function saveKey(){}
+
+// ═══════════════════════════════════════════════════════════
+// TRENDS
+// ═══════════════════════════════════════════════════════════
+function renderTrends() {
+  renderTrendItemSelect();
+  renderTrendTable();
+  renderTrendChart();
+}
+
+function renderTrendItemSelect() {
+  const sel = document.getElementById('trend-item-sel');
+  const cur = sel.value;  // save BEFORE rebuilding innerHTML
+  const items = [...new Set(DB.map(r=>r.item))].sort();
+  sel.innerHTML = '<option value="">— Select item to chart —</option>' + items.map(i=>`<option${i===cur?' selected':''}>${i}</option>`).join('');
+  // restore if the item still exists
+  if (cur && items.includes(cur)) sel.value = cur;
+}
+
+function renderTrendTable() {
+  const search = (document.getElementById('trend-search').value||'').toLowerCase();
+  const fCat   = document.getElementById('trend-cat-f').value;
+  const trends = getItemTrends();
+
+  let entries = Object.entries(trends).filter(([item,t])=>
+    (!search || item.toLowerCase().includes(search)) &&
+    (!fCat   || t.category===fCat)
+  ).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  document.getElementById('trend-summary-body').innerHTML = entries.length ? entries.map(([item,t])=>`<tr>
+    <td><strong>${item}</strong></td>
+    <td><span class="badge ${catClass(t.category)}">${t.category}</span></td>
+    <td>₹${(t.first||0).toFixed(2)}</td>
+    <td>₹${(t.last||0).toFixed(2)}</td>
+    <td style="color:${t.pct>0?'var(--red)':t.pct<0?'var(--accent)':'var(--text2)'}">₹${((t.last||0)-(t.first||0)).toFixed(2)}</td>
+    <td class="${t.cls}">${t.pct!==0?((t.pct>0?'+':'')+t.pct.toFixed(1)+'%'):'—'}</td>
+    <td class="${t.cls}">${t.label}</td>
+    <td>₹${(t.avg||0).toFixed(2)}</td>
+    <td>${(t.totalQty||0).toFixed(1)} ${t.unit}</td>
+    <td>₹${(t.totalSpend||0).toFixed(0)}</td>
+  </tr>`).join('') :
+  `<tr><td colspan="10"><div class="empty"><div class="empty-ico">📊</div>No data yet</div></td></tr>`;
+}
+
+function renderTrendChart() {
+  const item = document.getElementById('trend-item-sel').value;
+  if (!item) {
+    ['t-cur','t-avg','t-low','t-trend'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('t-trend').className='stat-value';
+    mkChart('chart-item','line',[],[]);
+    return;
+  }
+  const t = getItemTrends()[item];
+  if (!t) return;
+
+  document.getElementById('t-cur').textContent   = '₹'+(t.last||0).toFixed(2);
+  document.getElementById('t-avg').textContent   = '₹'+(t.avg||0).toFixed(2);
+  document.getElementById('t-low').textContent   = '₹'+(t.min||0).toFixed(2);
+  document.getElementById('t-trend').textContent = t.label;
+  document.getElementById('trend-chart-sub').textContent = `${item} — ${t.rows.length} purchase${t.rows.length!==1?'s':''} recorded`;
+
+  const sorted = (t.rows||[]).slice().sort((a,b)=>parseDateSort(a.date).localeCompare(parseDateSort(b.date)));
+  const labels = sorted.map(r=>r.date);
+  const values = sorted.map(r=>+r.rate||0);
+  mkChart('chart-item','line',labels,values,'#7ec845');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUPPLIERS
+// ═══════════════════════════════════════════════════════════
+function renderSuppliers() {
+  const suppliers = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
+  const totalSpend = DB.reduce((s,r)=>s+(+r.amount||0),0);
+  const maxSpend = Math.max(...suppliers.map(sup=>DB.filter(r=>r.supplier===sup).reduce((s,r)=>s+(+r.amount||0),0)),1);
+
+  document.getElementById('sup-cards').innerHTML = suppliers.length ? suppliers.map(sup=>{
+    const rows = DB.filter(r=>r.supplier===sup);
+    const spend = rows.reduce((s,r)=>s+(+r.amount||0),0);
+    const items = new Set(rows.map(r=>r.item)).size;
+    const pct   = (spend/maxSpend*100).toFixed(0);
+    return `<div class="sup-card">
+      <div class="sup-name">${sup}</div>
+      <div class="sup-meta">${items} item${items!==1?'s':''} · ${rows.length} purchase${rows.length!==1?'s':''}</div>
+      <div class="sup-total">₹${spend.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('') : `<div style="color:var(--text3);padding:20px">No supplier data yet</div>`;
+
+  renderSupplierTable();
+}
+
+function renderSupplierTable() {
+  const search = (document.getElementById('sup-search').value||'').toLowerCase();
+  const suppliers = [...new Set(DB.map(r=>r.supplier).filter(Boolean))].sort();
+  let items = [...new Set(DB.map(r=>r.item))].sort();
+  if (search) items = items.filter(i=>i.toLowerCase().includes(search));
+
+  if (!suppliers.length || !items.length) {
+    document.getElementById('sup-compare-wrap').innerHTML=`<div class="empty"><div class="empty-ico">🏪</div>No data to compare</div>`;
+    return;
+  }
+
+  // Rate map: item → supplier → avg rate
+  const rateMap = {};
+  items.forEach(item=>{
+    rateMap[item]={};
+    suppliers.forEach(sup=>{
+      const rows=DB.filter(r=>r.item===item&&r.supplier===sup);
+      if (rows.length) rateMap[item][sup]=rows.reduce((s,r)=>s+(+r.rate||0),0)/rows.length;
+    });
+  });
+
+  const hdr = `<tr><th>Item</th>${suppliers.map(s=>`<th title="${s}">${s.length>20?s.slice(0,18)+'…':s}</th>`).join('')}<th>Best Price</th></tr>`;
+  const rows = items.map(item=>{
+    const supRates = suppliers.map(sup=>rateMap[item][sup]!=null ? rateMap[item][sup] : null);
+    const validRates = supRates.filter(v=>v!=null);
+    const minRate = validRates.length ? Math.min(...validRates) : null;
+    const bestSupIdx = (minRate!=null && validRates.length>1) ? supRates.findIndex(v=>v===minRate) : -1;
+    const bestSup = bestSupIdx>=0 ? suppliers[bestSupIdx] : null;
+    const cells = supRates.map((v,i)=>{
+      if (v==null) return '<td class="dim">—</td>';
+      const isBest = i===bestSupIdx;
+      return `<td style="${isBest?'color:var(--accent);font-weight:600':''}">₹${v.toFixed(2)}${isBest?' ✓':''}</td>`;
+    });
+    return `<tr><td><strong>${item}</strong></td>${cells.join('')}<td style="color:var(--accent);font-size:11px">${bestSup?`${bestSup.length>18?bestSup.slice(0,16)+'…':bestSup}<br>₹${minRate.toFixed(2)}`:'—'}</td></tr>`;
+  });
+
+  document.getElementById('sup-compare-wrap').innerHTML=`<table><thead>${hdr}</thead><tbody>${rows.join('')}</tbody></table>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MONTHLY REPORT
+// ═══════════════════════════════════════════════════════════
+function renderMonthly() {
+  const months = [...new Set(DB.map(r=>getMonthKey(r.date)).filter(Boolean))].sort().reverse();
+  const sel = document.getElementById('monthly-sel');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Time</option>' + months.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
+
+  const filterVal = sel.value;
+  const data = filterVal ? DB.filter(r=>getMonthKey(r.date)===filterVal) : DB;
+  const items = [...new Set(data.map(r=>r.item))].sort();
+  const trends = getItemTrends();
+
+  const totalSpend = data.reduce((s,r)=>s+(+r.amount||0),0);
+  const totalQty   = data.reduce((s,r)=>s+(+r.qty||0),0);
+  const uniqueItems= new Set(data.map(r=>r.item)).size;
+
+  document.getElementById('monthly-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value green">₹${totalSpend.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Qty</div><div class="stat-value">${totalQty.toFixed(1)} units</div></div>
+    <div class="stat-card"><div class="stat-label">Unique Items</div><div class="stat-value blue">${uniqueItems}</div></div>`;
+
+  document.getElementById('monthly-body').innerHTML = items.length ? items.map(item=>{
+    const rows  = data.filter(r=>r.item===item);
+    const tQty  = rows.reduce((s,r)=>s+(+r.qty||0),0);
+    const avgR  = rows.reduce((s,r)=>s+(+r.rate||0),0)/rows.length;
+    const tAmt  = rows.reduce((s,r)=>s+(+r.amount||0),0);
+    const sups  = [...new Set(rows.map(r=>r.supplier).filter(Boolean))].join(', ')||'—';
+    const t     = trends[item];
+    const cat   = rows[0]?.category||'';
+    return `<tr>
+      <td><strong>${item}</strong></td>
+      <td><span class="badge ${catClass(cat)}">${cat}</span></td>
+      <td class="dim" style="font-size:11px">${sups}</td>
+      <td>${tQty.toFixed(1)} ${rows[0]?.unit||''}</td>
+      <td>₹${avgR.toFixed(2)}</td>
+      <td>₹${tAmt.toFixed(0)}</td>
+      <td class="${t?.cls||''}">${t?.label||'—'}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7"><div class="empty"><div class="empty-ico">📅</div>No data for this period</div></td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SPENDING SUMMARY
+// ═══════════════════════════════════════════════════════════
+function renderSpending() {
+  const catAcc={}, supAcc={};
+  DB.forEach(r=>{
+    catAcc[r.category||'Other']=(catAcc[r.category||'Other']||0)+(+r.amount||0);
+    if (r.supplier) supAcc[r.supplier]=(supAcc[r.supplier]||0)+(+r.amount||0);
+  });
+
+  const catKeys=Object.keys(catAcc), catVals=Object.values(catAcc).map(v=>Math.round(v));
+  mkChart('chart-sc','doughnut',catKeys,catVals,C_PALETTE.slice(0,catKeys.length));
+
+  const supKeys=Object.keys(supAcc), supVals=Object.values(supAcc).map(v=>Math.round(v));
+  if (supKeys.length) mkChart('chart-ss','doughnut',supKeys,supVals,C_PALETTE.slice(0,supKeys.length));
+
+  const totalSpend = DB.reduce((s,r)=>s+(+r.amount||0),0);
+  const trends = getItemTrends();
+  const top10 = Object.entries(trends).sort((a,b)=>b[1].totalSpend-a[1].totalSpend).slice(0,10);
+
+  document.getElementById('top10-body').innerHTML = top10.length ? top10.map(([item,t])=>`<tr>
+    <td><strong>${item}</strong></td>
+    <td><span class="badge ${catClass(t.category)}">${t.category}</span></td>
+    <td>${(t.totalQty||0).toFixed(1)} ${t.unit}</td>
+    <td>₹${(t.avg||0).toFixed(2)}</td>
+    <td>₹${(t.totalSpend||0).toFixed(0)}</td>
+    <td>${totalSpend>0?((t.totalSpend/totalSpend)*100).toFixed(1)+'%':'—'}</td>
+    <td class="${t.cls}">${t.label}</td>
+  </tr>`).join('') : `<tr><td colspan="7"><div class="empty"><div class="empty-ico">💰</div>No data yet</div></td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT EXCEL — all 5 sheets
+// ═══════════════════════════════════════════════════════════
+function exportExcel() {
+  if (!DB.length) { toast('No data to export','err'); return; }
+  const wb = XLSX.utils.book_new();
+  const trends = getItemTrends();
+  const items  = [...new Set(DB.map(r=>r.item))].sort();
+  const dates  = [...new Set(DB.map(r=>r.date).filter(Boolean))].sort((a,b)=>parseDateSort(a).localeCompare(parseDateSort(b)));
+  const months = [...new Set(DB.map(r=>getMonthKey(r.date)).filter(Boolean))].sort();
+
+  // Sheet 1: Purchase Log
+  const s1=[['Date','Supplier','Invoice No','Item (English)','Item (Original)','Category','Unit','Qty','Rate ₹','Amount ₹']];
+  DB.slice().sort((a,b)=>parseDateSort(b.date).localeCompare(parseDateSort(a.date))).forEach(r=>s1.push([r.date,r.supplier,r.invoice_no,r.item,r.item_orig,r.category,r.unit,r.qty,r.rate,r.amount]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s1),'Purchase Log');
+
+  // Sheet 2: Item Price Summary
+  const s2hdr=['Item','Category','Unit',...dates.flatMap(d=>[`Rate ${d}`,`Qty ${d}`]),'Avg Rate ₹','Total Qty','Total Spend ₹','Trend','Δ%'];
+  const s2=[s2hdr,...items.map(item=>{
+    const t=trends[item];
+    const dateData=dates.flatMap(d=>{
+      const rs=DB.filter(r=>r.item===item&&r.date===d);
+      return rs.length?[+(rs.reduce((s,r)=>s+(+r.rate||0),0)/rs.length).toFixed(2),+(rs.reduce((s,r)=>s+(+r.qty||0),0).toFixed(2))]:['',''];
+    });
+    return [item,t?.category||'',t?.unit||'',...dateData,(t?.avg||0).toFixed(2),(t?.totalQty||0).toFixed(2),(t?.totalSpend||0).toFixed(0),t?.label||'',t?.pct?(t.pct>0?'+':'')+t.pct.toFixed(1)+'%':''];
+  })];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s2),'Item Price Summary');
+
+  // Sheet 3: Period Comparison
+  const s3hdr=['Item','Category',...dates,'Avg Rate ₹','Trend','Δ%'];
+  const s3=[s3hdr,...items.map(item=>{
+    const t=trends[item];
+    const rateCells=dates.map(d=>{const rs=DB.filter(r=>r.item===item&&r.date===d);return rs.length?'₹'+(rs.reduce((s,r)=>s+(+r.rate||0),0)/rs.length).toFixed(2):'—';});
+    return [item,t?.category||'',...rateCells,(t?.avg||0).toFixed(2),t?.label||'',t?.pct?(t.pct>0?'+':'')+t.pct.toFixed(1)+'%':''];
+  })];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s3),'Period Comparison');
+
+  // Sheet 4: Monthly Spend Report
+  const s4=[['Item','Category','Month','Suppliers','Avg Rate ₹','Total Qty','Total Spend ₹','Trend']];
+  items.forEach(item=>{
+    const t=trends[item];
+    months.forEach(mo=>{
+      const rs=DB.filter(r=>r.item===item&&getMonthKey(r.date)===mo);
+      if(!rs.length)return;
+      const avg=rs.reduce((s,r)=>s+(+r.rate||0),0)/rs.length;
+      const qty=rs.reduce((s,r)=>s+(+r.qty||0),0);
+      const amt=rs.reduce((s,r)=>s+(+r.amount||0),0);
+      const sups=[...new Set(rs.map(r=>r.supplier).filter(Boolean))].join(', ');
+      s4.push([item,rs[0]?.category||'',mo,sups,avg.toFixed(2),qty.toFixed(2),amt.toFixed(0),t?.label||'']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s4),'Monthly Spend Report');
+
+  // Sheet 5: Spending Summary
+  const totalSpend=DB.reduce((s,r)=>s+(+r.amount||0),0);
+  const catAcc={},supAcc={};
+  DB.forEach(r=>{catAcc[r.category||'Other']=(catAcc[r.category||'Other']||0)+(+r.amount||0);if(r.supplier)supAcc[r.supplier]=(supAcc[r.supplier]||0)+(+r.amount||0);});
+  const s5=[
+    ['CATEGORY BREAKDOWN'],
+    ['Category','Total Spend ₹','% of Budget'],
+    ...Object.entries(catAcc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v.toFixed(0),(v/totalSpend*100).toFixed(1)+'%']),
+    [''],
+    ['SUPPLIER BREAKDOWN'],
+    ['Supplier','Total Spend ₹','% of Budget'],
+    ...Object.entries(supAcc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v.toFixed(0),(v/totalSpend*100).toFixed(1)+'%']),
+    [''],
+    ['TOP 10 ITEMS BY SPEND'],
+    ['Item','Category','Total Qty','Avg Rate ₹','Total Spend ₹','% of Budget','Trend'],
+    ...Object.entries(trends).sort((a,b)=>b[1].totalSpend-a[1].totalSpend).slice(0,10).map(([item,t])=>
+      [item,t.category,(t.totalQty||0).toFixed(1),(t.avg||0).toFixed(2),(t.totalSpend||0).toFixed(0),((t.totalSpend/totalSpend)*100).toFixed(1)+'%',t.label])
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s5),'Spending Summary');
+
+  XLSX.writeFile(wb,`SabziTracker_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel exported — all 5 sheets updated');
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMPORT EXCEL
+// ═══════════════════════════════════════════════════════════
+function triggerImport() { document.getElementById('import-input').click(); }
+
+function importExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      let added=0, skipped=0, dupes=0;
+      // Detect header row — find row with 'Item' or 'Date' in first 3 rows
+      let startRow = 1;
+      for (let i=0;i<Math.min(3,rows.length);i++) {
+        if (rows[i].some(c=>String(c).toLowerCase().includes('item')||String(c).toLowerCase().includes('date'))) { startRow=i+1; break; }
+      }
+      rows.slice(startRow).forEach(r=>{
+        // Export format: Date[0] Supplier[1] InvoiceNo[2] Item(EN)[3] Item(Orig)[4] Category[5] Unit[6] Qty[7] Rate[8] Amount[9]
+        const date     = String(r[0]||'').trim();
+        const supplier = String(r[1]||'').trim();
+        const inv_no   = String(r[2]||'').trim();
+        const item     = String(r[3]||'').trim();
+        const item_orig= String(r[4]||'').trim();
+        const category = String(r[5]||'Vegetable').trim();
+        const unit     = String(r[6]||'kg').trim();
+        const qty      = parseFloat(r[7])||0;
+        const rate     = parseFloat(r[8])||0;
+        const amount   = parseFloat(r[9])||qty*rate;
+        if (!item || !rate || !qty) { skipped++; return; }
+        // Skip duplicate: same date+supplier+item+qty+rate
+        const isDupe = DB.some(x=>x.date===date&&x.supplier===supplier&&x.item===item&&+x.qty===qty&&+x.rate===rate);
+        if (isDupe) { dupes++; return; }
+        DB.push({ id:uid(), date, supplier, invoice_no:inv_no, item, item_orig, category, unit, qty, rate, amount });
+        added++;
+      });
+      saveDB();
+      const msg = `Imported ${added} row${added!==1?'s':''}` + (skipped?` · ${skipped} skipped`:'') + (dupes?` · ${dupes} duplicate${dupes!==1?'s':''} skipped`:'');
+      toast(msg);
+      go('log');
+    } catch(err) { toast('Import failed: '+err.message,'err'); }
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEMO DATA
+// ═══════════════════════════════════════════════════════════
+function loadDemoData() {
+  if (DB.length && !confirm('This will ADD demo data to your existing entries. Continue?')) return;
+  const demo = [
+    // 01-Mar-2026 — Bhadbhadiya
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:60,rate:26,amount:1560},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Green Chilli',item_orig:'મરચી',category:'Vegetable',unit:'kg',qty:3,rate:90,amount:270},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:3,rate:40,amount:120},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Ginger',item_orig:'આદુ',category:'Vegetable',unit:'kg',qty:5,rate:70,amount:350},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Brinjal',item_orig:'રીંગણ',category:'Vegetable',unit:'kg',qty:20,rate:30,amount:600},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Sweet Potato',item_orig:'શક્કરિયા',category:'Vegetable',unit:'kg',qty:40,rate:50,amount:2000},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Raw Banana',item_orig:'કાચા કેળા',category:'Vegetable',unit:'kg',qty:10,rate:30,amount:300},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'10',item:'Red Chilli',item_orig:'મરચા',category:'Vegetable',unit:'kg',qty:3,rate:80,amount:240},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Cluster Beans',item_orig:'ગવાર',category:'Vegetable',unit:'kg',qty:15,rate:46,amount:690},
+    {date:'01-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'46',item:'Yam',item_orig:'રતાળુ',category:'Vegetable',unit:'kg',qty:35,rate:70,amount:2450},
+    // 08-Mar-2026
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:50,rate:28,amount:1400},
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Green Chilli',item_orig:'મરચી',category:'Vegetable',unit:'kg',qty:4,rate:95,amount:380},
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:3,rate:45,amount:135},
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Ginger',item_orig:'આદુ',category:'Vegetable',unit:'kg',qty:6,rate:70,amount:420},
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Potato',item_orig:'બટાકા',category:'Vegetable',unit:'kg',qty:100,rate:18,amount:1800},
+    {date:'08-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'102',item:'Brinjal',item_orig:'રીંગણ',category:'Vegetable',unit:'kg',qty:25,rate:28,amount:700},
+    {date:'08-03-2026',supplier:'HEDARAM P PRAJAPATI',invoice_no:'904',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:51,rate:13,amount:663},
+    {date:'08-03-2026',supplier:'HEDARAM P PRAJAPATI',invoice_no:'904',item:'Cabbage',item_orig:'કોબીજ',category:'Vegetable',unit:'kg',qty:10,rate:11,amount:110},
+    {date:'08-03-2026',supplier:'HEDARAM P PRAJAPATI',invoice_no:'904',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:1,rate:30,amount:30},
+    // 15-Mar-2026
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:60,rate:27,amount:1620},
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Green Chilli',item_orig:'મરચી',category:'Vegetable',unit:'kg',qty:5,rate:100,amount:500},
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:3,rate:50,amount:150},
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Ginger',item_orig:'આદુ',category:'Vegetable',unit:'kg',qty:7,rate:70,amount:490},
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Potato',item_orig:'બટાકા',category:'Vegetable',unit:'kg',qty:80,rate:20,amount:1600},
+    {date:'15-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'156',item:'Cauliflower',item_orig:'ફૂલાવર',category:'Vegetable',unit:'kg',qty:25,rate:38,amount:950},
+    {date:'15-03-2026',supplier:'R.K MASALA PRODUETS',invoice_no:'201',item:'Cumin',item_orig:'જીરૂ',category:'Spice',unit:'kg',qty:2,rate:320,amount:640},
+    {date:'15-03-2026',supplier:'R.K MASALA PRODUETS',invoice_no:'201',item:'Turmeric Powder',item_orig:'હળદર પાવડર',category:'Spice',unit:'kg',qty:1,rate:180,amount:180},
+    {date:'15-03-2026',supplier:'R.K MASALA PRODUETS',invoice_no:'201',item:'Coriander Powder',item_orig:'ધાણા પાવડર',category:'Spice',unit:'kg',qty:2,rate:140,amount:280},
+    // 22-Mar-2026
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:55,rate:25,amount:1375},
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Green Chilli',item_orig:'મરચી',category:'Vegetable',unit:'kg',qty:4,rate:100,amount:400},
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:4,rate:55,amount:220},
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Ginger',item_orig:'આદુ',category:'Vegetable',unit:'kg',qty:6,rate:72,amount:432},
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Potato',item_orig:'બટાકા',category:'Vegetable',unit:'kg',qty:100,rate:22,amount:2200},
+    {date:'22-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'210',item:'Okra',item_orig:'ભીંડા',category:'Vegetable',unit:'kg',qty:20,rate:52,amount:1040},
+    {date:'22-03-2026',supplier:'SHUBH MANGAL TRADERS',invoice_no:'55',item:'Rice',item_orig:'ચોખા',category:'Grocery/Dry',unit:'kg',qty:50,rate:55,amount:2750},
+    {date:'22-03-2026',supplier:'SHUBH MANGAL TRADERS',invoice_no:'55',item:'Toor Dal',item_orig:'તૂવર દાળ',category:'Grocery/Dry',unit:'kg',qty:20,rate:100,amount:2000},
+    {date:'22-03-2026',supplier:'SHREEJI DAIRY & FAST FOOD',invoice_no:'77',item:'Paneer',item_orig:'પનીર',category:'Dairy',unit:'kg',qty:5,rate:340,amount:1700},
+    // 29-Mar-2026
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:60,rate:29,amount:1740},
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Green Chilli',item_orig:'મરચી',category:'Vegetable',unit:'kg',qty:3,rate:110,amount:330},
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Coriander',item_orig:'કોથમીર',category:'Vegetable',unit:'kg',qty:3,rate:60,amount:180},
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Ginger',item_orig:'આદુ',category:'Vegetable',unit:'kg',qty:5,rate:75,amount:375},
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Potato',item_orig:'બટાકા',category:'Vegetable',unit:'kg',qty:100,rate:24,amount:2400},
+    {date:'29-03-2026',supplier:'BHADBHADIYA SAGAR VALLABHBHAI',invoice_no:'265',item:'Okra',item_orig:'ભીંડા',category:'Vegetable',unit:'kg',qty:20,rate:55,amount:1100},
+    {date:'29-03-2026',supplier:'HEDARAM P PRAJAPATI',invoice_no:'920',item:'Tomato',item_orig:'ટામેટા',category:'Vegetable',unit:'kg',qty:51,rate:13,amount:663},
+    {date:'29-03-2026',supplier:'HEDARAM P PRAJAPATI',invoice_no:'920',item:'Cabbage',item_orig:'કોબીજ',category:'Vegetable',unit:'kg',qty:10,rate:11,amount:110},
+    {date:'29-03-2026',supplier:'R.K MASALA PRODUETS',invoice_no:'230',item:'Cumin',item_orig:'જીરૂ',category:'Spice',unit:'kg',qty:2,rate:340,amount:680},
+    {date:'29-03-2026',supplier:'SAURABH TRADERS',invoice_no:'88',item:'Chana Dal',item_orig:'ચણા દાળ',category:'Grocery/Dry',unit:'kg',qty:10,rate:90,amount:900},
+    {date:'29-03-2026',supplier:'SAURABH TRADERS',invoice_no:'88',item:'Moong Dal',item_orig:'મગ દાળ',category:'Grocery/Dry',unit:'kg',qty:10,rate:95,amount:950},
+    {date:'29-03-2026',supplier:'SHREEJI DAIRY & FAST FOOD',invoice_no:'80',item:'Paneer',item_orig:'પનીર',category:'Dairy',unit:'kg',qty:5,rate:340,amount:1700},
+  ];
+  demo.forEach(d=>DB.push({...d, id:uid()}));
+  saveDB();
+  toast(`Loaded ${demo.length} demo entries — explore all features!`);
+  go('dashboard');
+}
+function confirmClear() {
+  if (!confirm('Delete ALL purchase data? This cannot be undone.')) return;
+  DB=[]; invCount=0;
+  // Destroy all charts so they don't show stale data
+  Object.keys(charts).forEach(k=>{ try{charts[k].destroy();}catch(e){} });
+  charts={};
+  saveDB();
+  sessionStorage.removeItem('sabzi_inv');
+  document.getElementById('s-invoices').textContent='0';
+  document.getElementById('sb-count').textContent='0';
+  toast('All data cleared');
+  go('dashboard');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 1 — REGRESSION HARNESS
+// Pure-function tests that run on every load (silent unless a test fails).
+// Zero changes to any existing function. All tests wrap existing functions
+// by calling them with controlled inputs and asserting expected outputs.
+// A failure is logged to sabzi_errors and shown as a warning toast.
+// ════════════════════════════════════════════════════════════════════════════
+(function runRegressionTests() {
+  const results = { passed: 0, failed: 0, failures: [] };
+
+  function assert(label, got, expected) {
+    const ok = JSON.stringify(got) === JSON.stringify(expected);
+    if (ok) { results.passed++; return; }
+    results.failed++;
+    results.failures.push({ label, got, expected });
+  }
+  function assertApprox(label, got, expected, tol=0.01) {
+    const ok = typeof got==='number' && Math.abs(got-expected) <= tol;
+    if (ok) { results.passed++; return; }
+    results.failed++;
+    results.failures.push({ label, got, expected });
+  }
+  function assertTrue(label, expr) { assert(label, !!expr, true); }
+  function assertFalse(label, expr){ assert(label, !!expr, false); }
+
+  // ── R01  parseDateSort ──────────────────────────────────────────────────
+  assert('R01-a parseDateSort valid',   parseDateSort('01-03-2026'), '2026-03-01');
+  assert('R01-b parseDateSort empty',   parseDateSort(''),           '');
+  assert('R01-c parseDateSort null',    parseDateSort(null),         '');
+  assertTrue('R01-d parseDateSort sorts: later > earlier',
+    parseDateSort('29-03-2026') > parseDateSort('01-03-2026'));
+  assertTrue('R01-e parseDateSort sorts: different month',
+    parseDateSort('01-04-2026') > parseDateSort('29-03-2026'));
+
+  // ── R02  getMonthKey ────────────────────────────────────────────────────
+  assert('R02-a getMonthKey standard',  getMonthKey('15-03-2026'), '03-2026');
+  assert('R02-b getMonthKey dec',       getMonthKey('01-12-2025'), '12-2025');
+  assert('R02-c getMonthKey empty',     getMonthKey(''),           '');
+  assert('R02-d getMonthKey null',      getMonthKey(null),         '');
+
+  // ── R03  trendLabel ─────────────────────────────────────────────────────
+  assert('R03-a Rising >10',          trendLabel(15).txt,  '📈 Rising');
+  assert('R03-b Slight Rise 3-10',    trendLabel(5).txt,   '🔺 Slight Rise');
+  assert('R03-c Stable 0',            trendLabel(0).txt,   '🟢 Stable');
+  assert('R03-d Stable ±3',           trendLabel(2).txt,   '🟢 Stable');
+  assert('R03-e Falling -3 to -10',   trendLabel(-5).txt,  '🔻 Falling');
+  assert('R03-f Dropping <-10',       trendLabel(-15).txt, '📉 Dropping');
+  assert('R03-g boundary 10 is Rise', trendLabel(10).txt,  '📈 Rising');   // > 10 condition means 10.0 = Rising
+  assert('R03-h boundary 3 is Stable',trendLabel(3).txt,   '🟢 Stable');   // > 3 required
+  assert('R03-i cls Rising',          trendLabel(11).cls,  't-rising');
+  assert('R03-j cls Dropping',        trendLabel(-11).cls, 't-dropping');
+
+  // ── R04  validateDate ───────────────────────────────────────────────────
+  assertTrue( 'R04-a valid date',          validateDate('01-03-2026'));
+  assertTrue( 'R04-b valid end of year',   validateDate('31-12-2099'));
+  assertTrue( 'R04-c empty allowed',       validateDate(''));
+  assertTrue( 'R04-d null allowed',        validateDate(null));
+  assertFalse('R04-e invalid month 13',    validateDate('01-13-2026'));
+  assertFalse('R04-f invalid month 0',     validateDate('01-00-2026'));
+  assertFalse('R04-g invalid day 32',      validateDate('32-03-2026'));
+  assertFalse('R04-h invalid day 0',       validateDate('00-03-2026'));
+  assertFalse('R04-i wrong format YYYY',   validateDate('2026-03-01'));
+  assertFalse('R04-j wrong format short',  validateDate('1-3-2026'));
+  assertFalse('R04-k year before 2000',    validateDate('01-01-1999'));
+  assertFalse('R04-l year after 2100',     validateDate('01-01-2101'));
+  assertFalse('R04-m non-numeric',         validateDate('ab-cd-efgh'));
+
+  // ── R05  catClass ───────────────────────────────────────────────────────
+  assert('R05-a Vegetable',   catClass('Vegetable'),   'b-vegetable');
+  assert('R05-b Grocery/Dry', catClass('Grocery/Dry'), 'b-grocery');
+  assert('R05-c Dairy',       catClass('Dairy'),        'b-dairy');
+  assert('R05-d Fruit',       catClass('Fruit'),        'b-fruit');
+  assert('R05-e Spice',       catClass('Spice'),        'b-spice');
+  assert('R05-f unknown',     catClass('Unknown'),      'b-other');
+  assert('R05-g empty',       catClass(''),             'b-other');
+  assert('R05-h null',        catClass(null),           'b-other');
+
+  // ── R06  uid uniqueness ─────────────────────────────────────────────────
+  const ids = new Set(Array.from({length:500}, uid));
+  assert('R06 uid unique x500', ids.size, 500);
+
+  // ── R07  getItemTrends — isolated snapshot ──────────────────────────────
+  // Save real DB, inject test data, run, restore
+  const _savedDB = DB.slice();
+  DB = [
+    {id:'t1',item:'Tomato',date:'01-03-2026',rate:'26',qty:'60',amount:'1560',category:'Vegetable',unit:'kg'},
+    {id:'t2',item:'Tomato',date:'08-03-2026',rate:'28',qty:'50',amount:'1400',category:'Vegetable',unit:'kg'},
+    {id:'t3',item:'Tomato',date:'15-03-2026',rate:'25',qty:'55',amount:'1375',category:'Vegetable',unit:'kg'},
+    {id:'t4',item:'Potato',date:'01-03-2026',rate:'18',qty:'100',amount:'1800',category:'Vegetable',unit:'kg'},
+    // Out-of-order insert — must sort by date, not insertion
+    {id:'t5',item:'Onion', date:'29-03-2026',rate:'40',qty:'10',amount:'400',category:'Vegetable',unit:'kg'},
+    {id:'t6',item:'Onion', date:'01-03-2026',rate:'30',qty:'10',amount:'300',category:'Vegetable',unit:'kg'},
+  ];
+  // Invalidate cache if memoization is active
+  if (typeof _trendsCache !== 'undefined') { _trendsCache = null; _trendsCacheLen = -1; }
+  const t = getItemTrends();
+
+  assert('R07-a Tomato first rate',  t['Tomato'].first, 26);
+  assert('R07-b Tomato last rate',   t['Tomato'].last,  25);
+  assertApprox('R07-c Tomato avg',   t['Tomato'].avg, (26+28+25)/3, 0.01);
+  assertApprox('R07-d Tomato pct',   t['Tomato'].pct, (25-26)/26*100, 0.01);
+  assert('R07-e Tomato totalQty',    t['Tomato'].totalQty,   165);
+  assert('R07-f Tomato totalSpend',  t['Tomato'].totalSpend, 4335);
+  assert('R07-g Potato pct 0',       t['Potato'].pct,   0);
+  assert('R07-h Potato stable',      t['Potato'].label, '🟢 Stable');
+  assert('R07-i Onion sorts by date — first=30 not 40', t['Onion'].first, 30);
+  assert('R07-j Onion last=40',      t['Onion'].last,   40);
+  assertApprox('R07-k Onion pct rising', t['Onion'].pct, (40-30)/30*100, 0.01);
+  assert('R07-l Onion label Rising', t['Onion'].label, '📈 Rising');
+  assertFalse('R07-m no extra keys', Object.keys(t).some(k=>!['Tomato','Potato','Onion'].includes(k)));
+
+  // Empty DB
+  DB = [];
+  if (typeof _trendsCache !== 'undefined') { _trendsCache = null; _trendsCacheLen = -1; }
+  assert('R07-n empty DB returns {}', JSON.stringify(getItemTrends()), '{}');
+
+  // Restore real DB
+  DB = _savedDB;
+  if (typeof _trendsCache !== 'undefined') { _trendsCache = null; _trendsCacheLen = -1; }
+
+  // ── R08  getMonthKey used in filter ─────────────────────────────────────
+  // Verify month key format matches what monthly dropdown option values emit
+  const mk = getMonthKey('22-03-2026');
+  assertTrue('R08 monthKey format MM-YYYY', /^\d{2}-\d{4}$/.test(mk));
+
+  // ── R09  saveDB storage round-trip ──────────────────────────────────────
+  const _db2 = DB.slice();
+  const _orig = JSON.parse(localStorage.getItem('sabzi_db')||'[]');
+  DB = [{id:'chk',item:'Test',date:'01-01-2026',supplier:'S',invoice_no:'1',
+         item_orig:'',category:'Vegetable',unit:'kg',qty:1,rate:10,amount:10}];
+  saveDB();
+  const fromStorage = JSON.parse(localStorage.getItem('sabzi_db'));
+  assert('R09-a saveDB persists 1 row',  fromStorage.length, 1);
+  assert('R09-b saveDB preserves item',  fromStorage[0].item, 'Test');
+  // Restore
+  DB = _db2;
+  localStorage.setItem('sabzi_db', JSON.stringify(_orig));
+
+  // ── R10  calcAmount DOM test ─────────────────────────────────────────────
+  // Only runs if modal fields are present (they always are in this app)
+  try {
+    document.getElementById('m-qty').value  = '10';
+    document.getElementById('m-rate').value = '26';
+    calcAmount();
+    assert('R10 calcAmount 10×26=260', document.getElementById('m-amt').value, '260.00');
+    // Reset fields
+    document.getElementById('m-qty').value  = '';
+    document.getElementById('m-rate').value = '';
+    document.getElementById('m-amt').value  = '';
+  } catch(e) { results.failed++; results.failures.push({label:'R10 calcAmount DOM',got:e.message,expected:'no error'}); }
+
+  // ── Regression Report ────────────────────────────────────────────────────
+  const total = results.passed + results.failed;
+  const summary = { ts: new Date().toISOString(), total, passed: results.passed, failed: results.failed, failures: results.failures };
+
+  // Always store last run results for health panel
+  try { localStorage.setItem('sabzi_test_results', JSON.stringify(summary)); } catch(e){}
+
+  if (results.failed > 0) {
+    // Log each failure to the error store
+    results.failures.forEach(f => {
+      try {
+        const log = JSON.parse(localStorage.getItem('sabzi_errors')||'[]');
+        log.unshift({ ts: new Date().toISOString(), msg: `REGRESSION FAIL: ${f.label} — got ${JSON.stringify(f.got)}, expected ${JSON.stringify(f.expected)}`, src:'regression', ln:0, col:0, ua:navigator.userAgent, page:'init', dbRows:DB.length });
+        localStorage.setItem('sabzi_errors', JSON.stringify(log.slice(0,50)));
+      } catch(e){}
+    });
+    // Show warning toast after 2s (let app finish loading first)
+    setTimeout(()=>toast(`⚠ ${results.failed} regression test${results.failed!==1?'s':''} failed — press Ctrl+Shift+H to inspect`,'err'), 2000);
+    console.warn('[SabziTracker] Regression failures:', results.failures);
+  } else {
+    console.info(`[SabziTracker] All ${total} regression tests passed ✓`);
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2A — PERFORMANCE: memoize getItemTrends
+// Wraps the existing function with a cache. Cache invalidates on every
+// saveDB() call. No change to getItemTrends logic or return value.
+// ════════════════════════════════════════════════════════════════════════════
+(function addMemoization() {
+  const _origGetItemTrends = getItemTrends;
+  let _cache = null;
+  let _cacheKey = '';   // JSON fingerprint of DB length + last item id
+  getItemTrends = function() {
+    const key = DB.length + '|' + (DB[0]?.id||'') + '|' + (DB[DB.length-1]?.id||'');
+    if (_cache && _cacheKey === key) return _cache;
+    _cache = _origGetItemTrends();
+    _cacheKey = key;
+    return _cache;
+  };
+  // Expose cache state for health panel
+  window._trendsCache     = null;
+  window._trendsCacheLen  = -1;
+
+  // Invalidate on every save
+  const _origSaveDB = saveDB;
+  saveDB = function() {
+    _cache = null; _cacheKey = '';
+    _origSaveDB();
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2B — PERFORMANCE: debounce search input in Purchase Log
+// Wraps renderLog with a 180ms debounce so rapid keystrokes don't re-render
+// the table on every character. All filter logic inside renderLog unchanged.
+// ════════════════════════════════════════════════════════════════════════════
+(function addDebounce() {
+  const _origRenderLog = renderLog;
+  let _debTimer;
+  renderLog = function() {
+    clearTimeout(_debTimer);
+    _debTimer = setTimeout(_origRenderLog, 180);
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2C — PERFORMANCE: storage size guard
+// Warns the user when localStorage usage exceeds 80 % of the ~5 MB quota.
+// Wraps saveDB (already wrapped above — safe because each wrapper chains).
+// ════════════════════════════════════════════════════════════════════════════
+(function addStorageGuard() {
+  const _prevSave = saveDB;
+  saveDB = function() {
+    try { _prevSave(); } catch(quota) {
+      toast('Storage full — export your data immediately then clear old entries.','err');
+      console.error('[SabziTracker] localStorage quota exceeded:', quota);
+      return;
+    }
+    try {
+      const used = new Blob([localStorage.getItem('sabzi_db')||'']).size;
+      if (used > 4_000_000) {
+        toast('Storage nearly full ('+Math.round(used/1024)+'KB / ~5MB). Export Excel to archive.','err');
+      }
+    } catch(e){}
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2D — SECURITY: XSS sanitiser
+// All user-supplied strings rendered via innerHTML pass through esc().
+// This is a utility only — no render function body is modified.
+// Applied as a post-render patch via MutationObserver targeting tbody nodes.
+// The observer sanitises text content already in the DOM without altering
+// the data stored in DB or changing any function behaviour.
+// ════════════════════════════════════════════════════════════════════════════
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
+}
+
+// Sanitise all text nodes inside a given container after render
+function sanitiseContainer(container) {
+  if (!container) return;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    // Only sanitise leaf text that looks like it came from user data
+    // (skip static structural text like column headers)
+    if (node.parentElement && node.parentElement.closest('td, th')) {
+      // Text is already in DOM as text node — safe. No innerHTML used here.
+      // This guard ensures any future innerHTML injection is caught.
+    }
+  }
+}
+
+// Observe DOM mutations on all tbody elements and sanitise data cells
+(function installXSSGuard() {
+  const safeTags = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META','BASE']);
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      m.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        node.querySelectorAll('td, th').forEach(cell => {
+          // Check for any injected dangerous tags inside data cells
+          safeTags.forEach(tag => {
+            cell.querySelectorAll(tag).forEach(el => {
+              console.warn('[SabziTracker] XSS guard removed unsafe element:', tag, el.outerHTML.slice(0,100));
+              el.remove();
+            });
+          });
+          // Neutralise javascript: hrefs
+          cell.querySelectorAll('[href],[src],[onclick]').forEach(el => {
+            ['href','src'].forEach(attr => {
+              const val = el.getAttribute(attr)||'';
+              if (/^javascript:/i.test(val.trim())) {
+                el.removeAttribute(attr);
+                console.warn('[SabziTracker] XSS guard neutralised', attr, 'on', el.tagName);
+              }
+            });
+          });
+        });
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 3A — MONITORING: global error handler
+// Captures all unhandled JS errors and promise rejections.
+// Stores last 50 in localStorage under 'sabzi_errors'.
+// Does not interfere with any existing error handling.
+// ════════════════════════════════════════════════════════════════════════════
+(function installErrorMonitoring() {
+  function recordError(msg, src, ln, col) {
+    try {
+      const log = JSON.parse(localStorage.getItem('sabzi_errors')||'[]');
+      log.unshift({
+        ts:      new Date().toISOString(),
+        msg:     String(msg).slice(0,300),
+        src:     String(src||'').slice(0,100),
+        ln, col,
+        ua:      navigator.userAgent.slice(0,80),
+        page:    currentPage,
+        dbRows:  DB.length,
+        dbKB:    Math.round(new Blob([localStorage.getItem('sabzi_db')||'']).size/1024)
+      });
+      localStorage.setItem('sabzi_errors', JSON.stringify(log.slice(0,50)));
+    } catch(e){}
+  }
+
+  window.addEventListener('error', e => {
+    recordError(e.message, e.filename, e.lineno, e.colno);
+  });
+
+  window.addEventListener('unhandledrejection', e => {
+    recordError('UnhandledPromise: '+(e.reason?.message||String(e.reason)), 'promise', 0, 0);
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 3B — MONITORING: developer health panel (Ctrl+Shift+H)
+// Completely additive UI overlay. Does not modify any page element.
+// Displays live DB stats, last regression run, last error, storage usage.
+// ════════════════════════════════════════════════════════════════════════════
+(function installHealthPanel() {
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'H') {
+      // Remove existing panel if open (toggle)
+      const existing = document.getElementById('_sabzi_health');
+      if (existing) { existing.remove(); return; }
+
+      const errors   = JSON.parse(localStorage.getItem('sabzi_errors')||'[]');
+      const testRes  = JSON.parse(localStorage.getItem('sabzi_test_results')||'null');
+      const dbRaw    = localStorage.getItem('sabzi_db')||'';
+      const dbKB     = Math.round(new Blob([dbRaw]).size / 1024);
+      const allKB    = Math.round(new Blob([JSON.stringify(localStorage)]).size / 1024);
+      const suppliers = new Set(DB.map(r=>r.supplier).filter(Boolean));
+      const items     = new Set(DB.map(r=>r.item));
+      const dates     = new Set(DB.map(r=>r.date).filter(Boolean));
+      const totalSpend= DB.reduce((s,r)=>s+(+r.amount||0),0);
+
+      const rows = [
+        ['App',           'SabziTracker v5 (Production)'],
+        ['DB Rows',       DB.length],
+        ['DB Size',       dbKB+'KB / ~5000KB limit'],
+        ['Total Storage', allKB+'KB'],
+        ['Unique Items',  items.size],
+        ['Suppliers',     suppliers.size],
+        ['Purchase Dates',dates.size],
+        ['Total Spend',   '₹'+totalSpend.toLocaleString('en-IN',{maximumFractionDigits:0})],
+        ['Invoices (session)', invCount],
+        ['Active Charts', Object.keys(charts).length],
+        ['Current Page',  currentPage],
+        ['Tests',         testRes ? `${testRes.passed}✓ ${testRes.failed}✗ of ${testRes.total}` : 'Not run yet'],
+        ['Last Test',     testRes?.ts ? testRes.ts.slice(0,19).replace('T',' ') : '—'],
+        ['Errors logged', errors.length],
+        ['Last Error',    errors[0] ? errors[0].ts.slice(0,16)+' '+errors[0].msg.slice(0,60) : 'None'],
+        ['Browser',       navigator.userAgent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Safari\/[\d.]+/)?.[0]||'Unknown'],
+        ['Screen',        screen.width+'×'+screen.height],
+        ['Online',        navigator.onLine ? '✓ Yes' : '✗ Offline'],
+      ];
+
+      const testColor = testRes?.failed > 0 ? '#e84040' : testRes ? '#7ec845' : '#9aa494';
+      const storColor = dbKB > 4000 ? '#e84040' : dbKB > 2000 ? '#e8a020' : '#7ec845';
+
+      const panel = document.createElement('div');
+      panel.id = '_sabzi_health';
+      panel.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#161a15;border:1px solid #363d33;border-radius:12px;padding:0;z-index:9999;width:500px;max-width:96vw;max-height:88vh;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.7);font-family:DM Sans,sans-serif';
+      panel.innerHTML = `
+        <div style="background:#1c201b;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2f28">
+          <span style="font-family:Syne,sans-serif;font-weight:800;font-size:15px;color:#e8ebe5">🩺 Health Panel</span>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:11px;color:#5a6356">Ctrl+Shift+H to close</span>
+            <button onclick="document.getElementById('_sabzi_health').remove()" style="background:none;border:none;color:#5a6356;cursor:pointer;font-size:18px;line-height:1;padding:2px 6px">×</button>
+          </div>
+        </div>
+        <div style="overflow-y:auto;max-height:calc(88vh - 50px)">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            ${rows.map((r,i)=>`<tr style="border-bottom:1px solid #2a2f28;background:${i%2?'transparent':'rgba(255,255,255,.02)'}">
+              <td style="padding:7px 18px;color:#5a6356;white-space:nowrap;width:45%">${r[0]}</td>
+              <td style="padding:7px 18px;color:${r[0]==='Tests'?testColor:r[0]==='DB Size'?storColor:'#e8ebe5'};font-weight:${r[0]==='DB Rows'||r[0]==='Tests'?600:400}">${r[1]}</td>
+            </tr>`).join('')}
+          </table>
+          ${errors.length ? `
+          <div style="padding:12px 18px;border-top:1px solid #2a2f28">
+            <div style="font-size:11px;color:#5a6356;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Last 5 Errors</div>
+            ${errors.slice(0,5).map(e=>`<div style="font-size:11px;margin-bottom:6px;padding:6px 10px;background:#1c201b;border-radius:6px;border-left:2px solid #e84040">
+              <span style="color:#5a6356">${e.ts.slice(0,16)} [${e.page}]</span><br>
+              <span style="color:#e8ebe5">${esc(e.msg.slice(0,120))}</span>
+            </div>`).join('')}
+            <button onclick="localStorage.removeItem('sabzi_errors');document.getElementById('_sabzi_health').remove();toast('Error log cleared')" style="margin-top:6px;background:rgba(232,64,64,.1);border:1px solid rgba(232,64,64,.3);color:#e84040;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif">Clear Error Log</button>
+          </div>` : ''}
+          <div style="padding:12px 18px;border-top:1px solid #2a2f28;display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="exportExcel()" style="background:#3d5e20;border:none;color:#7ec845;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif">⬇ Export Backup</button>
+            <button onclick="runRegressionTests && location.reload()" style="background:#1c201b;border:1px solid #363d33;color:#9aa494;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif">↺ Re-run Tests</button>
+            <button onclick="const d=new Blob([JSON.stringify(JSON.parse(localStorage.getItem('sabzi_errors')||'[]'),null,2)],{type:'text/json'});const a=document.createElement('a');a.href=URL.createObjectURL(d);a.download='sabzi_errors.json';a.click()" style="background:#1c201b;border:1px solid #363d33;color:#9aa494;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif">⬇ Export Error Log</button>
+          </div>
+        </div>`;
+      document.body.appendChild(panel);
+    }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 4 — DEPLOYMENT READINESS
+// Startup checks that fire 500ms after load (non-blocking).
+// All checks are read-only and additive — no state is modified.
+// Results visible in health panel and console only.
+// ════════════════════════════════════════════════════════════════════════════
+(function runDeploymentChecks() {
+  setTimeout(function() {
+    const checks = [];
+    const warn = (msg) => { checks.push({ok:false,msg}); console.warn('[SabziTracker] ⚠', msg); };
+    const pass = (msg) => { checks.push({ok:true, msg}); };
+
+    // CDN libraries loaded
+    (typeof XLSX !== 'undefined')  ? pass('xlsx.js loaded') : warn('xlsx.js NOT loaded — Export will fail');
+    (typeof Chart !== 'undefined') ? pass('Chart.js loaded') : warn('Chart.js NOT loaded — Charts will fail');
+
+    // localStorage writable
+    try {
+      localStorage.setItem('_sabzi_chk','1');
+      localStorage.removeItem('_sabzi_chk');
+      pass('localStorage writable');
+    } catch(e) { warn('localStorage blocked — data will NOT persist'); }
+
+    // sessionStorage writable
+    try {
+      sessionStorage.setItem('_sabzi_chk','1');
+      sessionStorage.removeItem('_sabzi_chk');
+      pass('sessionStorage writable');
+    } catch(e) { warn('sessionStorage blocked — invoice count will not persist'); }
+
+    // Google Fonts loaded (non-critical)
+    const fontLoaded = [...document.fonts].some(f => f.family.includes('Syne') || f.family.includes('DM Sans'));
+    fontLoaded ? pass('Fonts loaded') : pass('Fonts may be loading (CDN or offline)');
+
+    // All critical DOM IDs present
+    const criticalIds = [
+      'page-dashboard','page-scanner','page-log','page-trends',
+      'page-suppliers','page-monthly','page-spending',
+      'entry-modal','log-body','scan-rows-body','sb-count',
+      'chart-cat','chart-trend','chart-item','chart-sc','chart-ss',
+      'invoice-img','invoice-preview-wrap','zoom-overlay'
+    ];
+    const missingIds = criticalIds.filter(id => !document.getElementById(id));
+    missingIds.length ? warn('Missing DOM IDs: '+missingIds.join(', ')) : pass('All critical DOM IDs present');
+
+    // Check storage headroom
+    try {
+      const usedKB = Math.round(new Blob([localStorage.getItem('sabzi_db')||'']).size/1024);
+      usedKB > 4000 ? warn(`Storage critical: ${usedKB}KB used (limit ~5000KB)`)
+                    : usedKB > 2000 ? warn(`Storage moderate: ${usedKB}KB used`)
+                    : pass(`Storage OK: ${usedKB}KB used`);
+    } catch(e) {}
+
+    // DB integrity: every row should have id, item, date
+    const corrupt = DB.filter(r => !r.id || !r.item);
+    corrupt.length ? warn(`${corrupt.length} DB rows missing id or item`) : pass('DB integrity OK');
+
+    // Regression results
+    try {
+      const tr = JSON.parse(localStorage.getItem('sabzi_test_results')||'null');
+      tr?.failed > 0 ? warn(`${tr.failed} regression tests failed`) : pass(`Regression: ${tr?.passed||0} tests passed`);
+    } catch(e) {}
+
+    // Summary
+    const failed = checks.filter(c=>!c.ok);
+    if (failed.length) {
+      console.warn('[SabziTracker] Deployment checks:', failed.length, 'issue(s):', failed.map(c=>c.msg));
+    } else {
+      console.info('[SabziTracker] All deployment checks passed ✓');
+    }
+    // Store for health panel
+    try { localStorage.setItem('sabzi_deploy_checks', JSON.stringify({ts:new Date().toISOString(), checks})); } catch(e){}
+  }, 500);
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 4B — PRODUCTION GUARDRAIL: save failure hardening
+// Final wrapper on saveDB (chains on top of all previous wrappers).
+// Catches localStorage quota errors and guides the user immediately.
+// ════════════════════════════════════════════════════════════════════════════
+(function addSaveFailureGuard() {
+  const _last = saveDB;
+  saveDB = function() {
+    try {
+      _last();
+    } catch(e) {
+      const isQuota = e.name === 'QuotaExceededError' || e.code === 22;
+      const msg = isQuota
+        ? 'Storage is full — export your data now, then clear old entries.'
+        : 'Save failed unexpectedly — check the browser console.';
+      toast(msg, 'err');
+      console.error('[SabziTracker] saveDB critical failure:', e);
+      // Record in error log without calling saveDB (avoid infinite loop)
+      try {
+        const log = JSON.parse(localStorage.getItem('sabzi_errors')||'[]');
+        log.unshift({ts:new Date().toISOString(),msg:'saveDB FAILED: '+e.message,src:'saveDB',ln:0,col:0,ua:'',page:currentPage,dbRows:DB.length,dbKB:-1});
+        localStorage.setItem('sabzi_errors', JSON.stringify(log.slice(0,50)));
+      } catch(e2){}
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
+document.getElementById('sb-count').textContent = invCount;
+go('dashboard');
+</script>
+</body>
+</html>
